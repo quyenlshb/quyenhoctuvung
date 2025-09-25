@@ -1,9 +1,9 @@
 import esbuild from 'esbuild'
 import stylePlugin from 'esbuild-style-plugin'
-import { readdirSync, statSync, copyFileSync, mkdirSync, existsSync, cpSync, rmSync } from 'fs' // ✅ ĐÃ THÊM: rmSync
+import { readdirSync, statSync, copyFileSync, mkdirSync, existsSync, cpSync, rmSync } from 'fs' // ✅ rmSync đã được giữ lại
 import { join } from 'path'
-import tailwindcss from 'tailwindcss' // ✅ Đã sửa lỗi: Import tailwindcss
-import autoprefixer from 'autoprefixer' // ✅ Đã sửa lỗi: Import autoprefixer
+import tailwindcss from 'tailwindcss' 
+import autoprefixer from 'autoprefixer' 
 
 // Get all files recursively
 function getFiles(dir) {
@@ -23,10 +23,9 @@ function getFiles(dir) {
   return files
 }
 
-// Hàm dọn dẹp thư mục dist (ĐÃ SỬA LỖI)
+// Hàm dọn dẹp thư mục dist (ĐÃ SỬA LỖI Netlify)
 function cleanDist(dir) {
   if (existsSync(dir)) {
-    // SỬA LỖI: Sử dụng rmSync để xóa thư mục một cách an toàn
     rmSync(dir, { recursive: true, force: true }) 
   }
 }
@@ -45,7 +44,7 @@ if (!existsSync(outDir)) {
 await esbuild.build({
   entryPoints: getFiles('src').filter(file => 
     file.endsWith('.ts') || file.endsWith('.tsx') || file.endsWith('.js') || file.endsWith('.jsx')
-  ).filter(file => !file.includes('/__tests__/')), // Bỏ qua các file test
+  ).filter(file => !file.includes('/__tests__/')), 
   
   // Chỉ bundle file main.tsx, các entry points còn lại sẽ là các file dependencies
   entryPoints: ['./src/main.tsx'], 
@@ -59,7 +58,6 @@ await esbuild.build({
   sourcemap: !isProduction,
   plugins: [
     stylePlugin({
-      // Sử dụng tên biến đã import (tailwindcss, autoprefixer)
       postcss: {
         plugins: [tailwindcss, autoprefixer] 
       }
@@ -70,8 +68,10 @@ await esbuild.build({
   define: {
     'process.env.NODE_ENV': isProduction ? '\"production\"' : '\"development\"'
   },
-  // Tùy chọn: react-shim.js có thể là một file nhỏ để import React vào môi trường cũ hơn, nhưng không cần thiết với React 18
-  // inject: ['./src/react-shim.js'], 
+  
+  // ✅ ĐÃ SỬA: BẬT inject để khắc phục lỗi "React is not defined"
+  inject: ['./src/react-shim.js'], 
+  
   loader: {
     '.js': 'jsx',
     '.ts': 'tsx'
