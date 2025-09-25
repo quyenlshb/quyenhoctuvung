@@ -3,7 +3,7 @@ import { LogOut, Home, Settings, Brain, BookOpen, BarChart3, Menu, X } from 'luc
 import { useState } from 'react';
 
 // ✅ ĐÃ SỬA LỖI: Thêm đuôi file '.tsx' vào đường dẫn import
-import { useIsMobile } from '../use-mobile.tsx'; 
+import { useIsMobile } from '../hooks/use-mobile.tsx';
 import { Button } from './ui/button';
 import { useAuth } from './AuthProvider'; // Dùng AuthContext của bạn
 
