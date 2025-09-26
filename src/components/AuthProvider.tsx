@@ -10,24 +10,28 @@ import { Input } from './ui/input'
 import { Label } from './ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 import { 
-  User, 
+  User as UserIcon, 
   Mail, 
   Lock, 
   Eye, 
   EyeOff,
   LogOut
 } from 'lucide-react'
-import { FcGoogle } from 'react-icons/fc'   // ✅ Google icon
+import { FcGoogle } from 'react-icons/fc'   
+import { useNavigate } from 'react-router-dom'
 
-// Firebase imports - these will be available when upgrading to advanced model
-// import { 
-//   signInWithEmailAndPassword, 
-//   createUserWithEmailAndPassword, 
-//   signInWithPopup, 
-//   signOut, 
-//   GoogleAuthProvider 
-// } from 'firebase/auth'
-// import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore'
+// ⚡️ IMPORT HÀM FIREBASE THỰC TẾ
+import { 
+  auth, // Exported auth instance
+  googleProvider,
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signInWithPopup, 
+  signOut, 
+  onAuthStateChanged,
+  saveUserData, // Function to save user data to Firestore
+  getUserData // Function to get user data from Firestore
+} from '../lib/firebase' // Đảm bảo đường dẫn này là chính xác
 
 interface User {
   id: string
@@ -43,191 +47,341 @@ interface User {
 interface AuthContextType {
   user: User | null
   loading: boolean
-  signIn: (email: string, password: string) => Promise<void>
-  signInWithGoogle: () => Promise<void>
-  signUp: (email: string, password: string, name: string) => Promise<void>
-  signOut: () => void
+  login: (email: string, password: string) => Promise<void>
+  register: (name: string, email: string, password: string) => Promise<void>
+  googleSignIn: () => Promise<void>
+  logout: () => void
+  showAuthModal: (shouldShow: boolean) => void // Thêm hàm để điều khiển hiển thị Auth Modal
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [showPassword, setShowPassword] = useState(false)
-
-  useEffect(() => {
-    const savedUser = localStorage.getItem('user')
-    if (savedUser) {
-      setUser(JSON.parse(savedUser))
-    }
-    setLoading(false)
-  }, [])
-
-  const signIn = async (email: string, password: string) => {
-    setLoading(true)
-    try {
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      const mockUser: User = {
-        id: Date.now().toString(),
-        email,
-        name: email.split('@')[0],
-        totalPoints: 1250,
-        streak: 12,
-        totalWordsLearned: 180,
-        totalTimeSpent: 480
-      }
-      setUser(mockUser)
-      localStorage.setItem('user', JSON.stringify(mockUser))
-    } catch (error) {
-      throw new Error('Đăng nhập thất bại')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const signInWithGoogle = async () => {
-    setLoading(true)
-    try {
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      const mockUser: User = {
-        id: Date.now().toString(),
-        email: 'user@gmail.com',
-        name: 'Google User',
-        photoURL: 'https://pub-cdn.sider.ai/u/U0O9H2J5XXK/web-coder/68d2b117788befa8029c3c81/resource/b6bc40ff-2e00-4b14-b1ed-a8550793d08b.jpg',
-        totalPoints: 1250,
-        streak: 12,
-        totalWordsLearned: 180,
-        totalTimeSpent: 480
-      }
-      setUser(mockUser)
-      localStorage.setItem('user', JSON.stringify(mockUser))
-    } catch (error) {
-      throw new Error('Đăng nhập Google thất bại')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const signUp = async (email: string, password: string, name: string) => {
-    setLoading(true)
-    try {
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      const mockUser: User = {
-        id: Date.now().toString(),
-        email,
-        name,
-        totalPoints: 0,
-        streak: 0,
-        totalWordsLearned: 0,
-        totalTimeSpent: 0
-      }
-      setUser(mockUser)
-      localStorage.setItem('user', JSON.stringify(mockUser))
-    } catch (error) {
-      throw new Error('Đăng ký thất bại')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const signOut = () => {
-    setUser(null)
-    localStorage.removeItem('user')
-  }
-
-  return (
-    <AuthContext.Provider value={{
-      user,
-      loading,
-      signIn,
-      signInWithGoogle,
-      signUp,
-      signOut
-    }}>
-      {children}
-    </AuthContext.Provider>
-  )
-}
-
-export function useAuth() {
+export const useAuth = () => {
   const context = useContext(AuthContext)
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useAuth must be used within an AuthProvider')
   }
   return context
 }
 
-export default function Auth() {
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const navigate = useNavigate()
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [showAuth, setShowAuth] = useState(false) // State để hiển thị/ẩn Auth Modal
+
+  // State cho Form
+  const [activeTab, setActiveTab] = useState('login')
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [name, setName] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
 
-  const { signIn, signInWithGoogle, signUp } = useAuth()
+  // 1. LẮNG NGHE TRẠNG THÁI XÁC THỰC FIREBASE
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        // Người dùng đã đăng nhập, tải dữ liệu Firestore
+        const userData = await getUserData(firebaseUser.uid)
+        
+        const appUser: User = {
+          id: firebaseUser.uid,
+          email: firebaseUser.email || '',
+          name: userData?.name || firebaseUser.displayName || 'Người dùng mới',
+          photoURL: firebaseUser.photoURL || undefined,
+          // Load other fields from Firestore if they exist, otherwise use default
+          totalPoints: userData?.totalPoints || 0,
+          streak: userData?.streak || 0,
+          totalWordsLearned: userData?.totalWordsLearned || 0,
+          totalTimeSpent: userData?.totalTimeSpent || 0,
+        }
+        setUser(appUser)
+        setShowAuth(false) // Đóng modal khi đăng nhập thành công
+        navigate('/') // Điều hướng về trang chủ
+      } else {
+        setUser(null)
+      }
+      setLoading(false)
+    })
 
-  const handleSignIn = async (e: React.FormEvent) => {
+    return () => unsubscribe()
+  }, [])
+
+  // 2. HÀM LOGIN BẰNG EMAIL/PASSWORD
+  const login = async (email: string, password: string) => {
+    setLoading(true)
+    setError(null)
+    try {
+      await signInWithEmailAndPassword(auth, email, password)
+      // onAuthStateChanged sẽ xử lý cập nhật state (setUser)
+    } catch (err: any) {
+      const firebaseError = err.code || 'Lỗi không xác định'
+      if (firebaseError === 'auth/invalid-credential') {
+        setError('Email hoặc mật khẩu không đúng.')
+      } else if (firebaseError === 'auth/user-not-found') {
+        setError('Người dùng không tồn tại.')
+      } else {
+        setError(`Lỗi đăng nhập: ${firebaseError}`)
+      }
+      setLoading(false)
+    }
+  }
+
+  // 3. HÀM ĐĂNG KÝ BẰNG EMAIL/PASSWORD
+  const register = async (name: string, email: string, password: string) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password)
+      const firebaseUser = userCredential.user
+      
+      // Khởi tạo hồ sơ người dùng trong Firestore
+      const initialUserData = {
+        name: name,
+        email: email,
+        createdAt: new Date(),
+        totalPoints: 0,
+        streak: 0,
+        totalWordsLearned: 0,
+        totalTimeSpent: 0,
+        // ... các cài đặt mặc định khác
+      }
+      await saveUserData(firebaseUser.uid, initialUserData)
+
+      // onAuthStateChanged sẽ xử lý cập nhật state (setUser)
+    } catch (err: any) {
+      const firebaseError = err.code || 'Lỗi không xác định'
+      if (firebaseError === 'auth/email-already-in-use') {
+        setError('Email này đã được sử dụng.')
+      } else if (firebaseError === 'auth/weak-password') {
+        setError('Mật khẩu phải có ít nhất 6 ký tự.')
+      } else {
+        setError(`Lỗi đăng ký: ${firebaseError}`)
+      }
+      setLoading(false)
+    }
+  }
+
+  // 4. HÀM LOGIN BẰNG GOOGLE
+  const googleSignIn = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const result = await signInWithPopup(auth, googleProvider)
+      const firebaseUser = result.user
+
+      // Kiểm tra xem người dùng đã có data trong Firestore chưa
+      const userData = await getUserData(firebaseUser.uid)
+
+      if (!userData) {
+        // Người dùng mới, tạo hồ sơ trong Firestore
+        const initialUserData = {
+          name: firebaseUser.displayName || 'Người dùng Google',
+          email: firebaseUser.email || '',
+          photoURL: firebaseUser.photoURL || undefined,
+          createdAt: new Date(),
+          totalPoints: 0,
+          streak: 0,
+          totalWordsLearned: 0,
+          totalTimeSpent: 0,
+        }
+        await saveUserData(firebaseUser.uid, initialUserData)
+      }
+      
+      // onAuthStateChanged sẽ xử lý cập nhật state (setUser)
+    } catch (err: any) {
+      console.error('Google Sign-In Error:', err)
+      setError('Đăng nhập bằng Google thất bại.')
+      setLoading(false)
+    }
+  }
+
+  // 5. HÀM LOGOUT
+  const logout = () => {
+    signOut(auth)
+      .then(() => {
+        setUser(null)
+        navigate('/') // Điều hướng về trang chủ
+      })
+      .catch((err) => {
+        console.error('Logout Error:', err)
+      })
+  }
+
+  // Hàm hiển thị/ẩn Auth Modal
+  const showAuthModal = (shouldShow: boolean) => {
+    setShowAuth(shouldShow)
+    setError(null) // Reset lỗi khi mở/đóng
+  }
+  
+  const value = {
+    user,
+    loading,
+    login,
+    register,
+    googleSignIn,
+    logout,
+    showAuthModal,
+  }
+
+  if (loading) {
+    // Hiển thị Loading State khi kiểm tra trạng thái Auth lần đầu
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
+        <p className="ml-3 text-lg text-primary">Đang tải...</p>
+      </div>
+    )
+  }
+
+  // Nếu người dùng KHÔNG đăng nhập, hiển thị giao diện Auth
+  if (!user && showAuth) {
+    return <AuthComponent 
+      activeTab={activeTab} 
+      setActiveTab={setActiveTab} 
+      name={name} setName={setName} 
+      email={email} setEmail={setEmail} 
+      password={password} setPassword={setPassword}
+      error={error} setError={setError}
+      login={login}
+      register={register}
+      googleSignIn={googleSignIn}
+      loading={loading}
+      showPassword={showPassword}
+      setShowPassword={setShowPassword}
+      setShowAuth={setShowAuth} // Truyền hàm đóng modal
+    />
+  }
+
+  // Mọi thứ đã sẵn sàng, hiển thị các component con
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+}
+
+// =========================================================
+// AUTH COMPONENT (Giao diện Login/Register)
+// =========================================================
+
+// Tách AuthComponent ra khỏi AuthProvider để làm cho code sạch hơn và dễ quản lý hơn
+interface AuthComponentProps {
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+  name: string;
+  setName: (name: string) => void;
+  email: string;
+  setEmail: (email: string) => void;
+  password: string;
+  setPassword: (password: string) => void;
+  error: string | null;
+  setError: (error: string | null) => void;
+  login: (email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string) => Promise<void>;
+  googleSignIn: () => Promise<void>;
+  loading: boolean;
+  showPassword: boolean;
+  setShowPassword: (show: boolean) => void;
+  setShowAuth: (show: boolean) => void;
+}
+
+const AuthComponent = ({
+  activeTab,
+  setActiveTab,
+  name,
+  setName,
+  email,
+  setEmail,
+  password,
+  setPassword,
+  error,
+  setError,
+  login,
+  register,
+  googleSignIn,
+  loading,
+  showPassword,
+  setShowPassword,
+  setShowAuth
+}: AuthComponentProps) => {
+  
+  // Xử lý đăng nhập
+  const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
-    setError('')
-    try {
-      await signIn(email, password)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Đăng nhập thất bại')
-    } finally {
-      setLoading(false)
+    if (!email || !password) {
+      setError('Vui lòng nhập đầy đủ email và mật khẩu.')
+      return
     }
+    login(email, password)
   }
 
-  const handleSignUp = async (e: React.FormEvent) => {
+  // Xử lý đăng ký
+  const handleRegister = (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
-    setError('')
-    try {
-      await signUp(email, password, name)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Đăng ký thất bại')
-    } finally {
-      setLoading(false)
+    if (!name || !email || !password) {
+      setError('Vui lòng nhập đầy đủ tên, email và mật khẩu.')
+      return
     }
+    register(name, email, password)
   }
-
-  const handleGoogleSignIn = async () => {
-    setLoading(true)
-    try {
-      await signInWithGoogle()
-    } catch {
-      setError('Đăng nhập Google thất bại')
-    } finally {
-      setLoading(false)
-    }
-  }
+  
+  // Reset form khi chuyển tab
+  useEffect(() => {
+    setError(null)
+    setEmail('')
+    setPassword('')
+    setName('')
+  }, [activeTab])
+  
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md bg-white dark:bg-gray-800 border-0 shadow-xl">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl text-gray-800 dark:text-white">
-            日本語学習
-          </CardTitle>
-          <CardDescription className="text-gray-600 dark:text-gray-300">
-            Bắt đầu hành trình học tiếng Nhật của bạn
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80">
+      <Card className="w-full max-w-sm mx-auto shadow-2xl">
+        <CardHeader className="p-6 pb-4">
+          <div className="flex justify-between items-center">
+             <CardTitle className="text-2xl font-bold">
+               {activeTab === 'login' ? 'Đăng nhập' : 'Đăng ký'}
+             </CardTitle>
+             <Button variant="ghost" size="icon" onClick={() => setShowAuth(false)}>
+                <LogOut className="h-4 w-4" />
+             </Button>
+          </div>
+          <CardDescription>
+            {activeTab === 'login' 
+              ? 'Nhập email và mật khẩu để truy cập ứng dụng.'
+              : 'Tạo tài khoản mới để bắt đầu học.'
+            }
           </CardDescription>
         </CardHeader>
-        
-        <CardContent>
-          <Tabs defaultValue="login" className="w-full">
+        <CardContent className="p-6 pt-0">
+          <Button 
+            variant="outline" 
+            className="w-full mb-4 flex items-center bg-white dark:bg-gray-800"
+            onClick={googleSignIn}
+            disabled={loading}
+          >
+            <FcGoogle className="h-5 w-5 mr-2" />
+            {loading ? 'Đang tải...' : 'Đăng nhập bằng Google'}
+          </Button>
+          
+          <div className="relative flex justify-center text-xs uppercase mb-6">
+            <span className="bg-card px-2 text-muted-foreground">
+              Hoặc tiếp tục bằng email
+            </span>
+          </div>
+
+          <Tabs 
+            value={activeTab} 
+            onValueChange={(tab) => setActiveTab(tab)} 
+            className="w-full"
+          >
             <TabsList className="grid w-full grid-cols-2 mb-6">
               <TabsTrigger value="login">Đăng nhập</TabsTrigger>
               <TabsTrigger value="register">Đăng ký</TabsTrigger>
             </TabsList>
-
-            <TabsContent value="login">
-              <form onSubmit={handleSignIn} className="space-y-4">
-                {/* Email */}
-                <div>
+            
+            {/* ======================= LOGIN TAB ======================= */}
+            <TabsContent value="login" className="mt-0">
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="space-y-2">
                   <Label htmlFor="login-email">Email</Label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
@@ -242,9 +396,7 @@ export default function Auth() {
                     />
                   </div>
                 </div>
-                
-                {/* Password */}
-                <div>
+                <div className="space-y-2">
                   <Label htmlFor="login-password">Mật khẩu</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
@@ -281,39 +433,15 @@ export default function Auth() {
                   {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
                 </Button>
               </form>
-
-              {/* OR */}
-              <div className="relative my-6">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300" />
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white dark:bg-gray-800 text-gray-500">
-                    Hoặc
-                  </span>
-                </div>
-              </div>
-
-              {/* Google Login */}
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full bg-transparent"
-                onClick={handleGoogleSignIn}
-                disabled={loading}
-              >
-                <FcGoogle className="h-4 w-4 mr-2" />
-                Đăng nhập với Google
-              </Button>
             </TabsContent>
 
-            <TabsContent value="register">
-              <form onSubmit={handleSignUp} className="space-y-4">
-                {/* Name */}
-                <div>
-                  <Label htmlFor="register-name">Họ tên</Label>
+            {/* ======================= REGISTER TAB ======================= */}
+            <TabsContent value="register" className="mt-0">
+              <form onSubmit={handleRegister} className="space-y-4">
+                 <div className="space-y-2">
+                  <Label htmlFor="register-name">Tên của bạn</Label>
                   <div className="relative">
-                    <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <UserIcon className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                     <Input
                       id="register-name"
                       type="text"
@@ -325,9 +453,7 @@ export default function Auth() {
                     />
                   </div>
                 </div>
-                
-                {/* Email */}
-                <div>
+                <div className="space-y-2">
                   <Label htmlFor="register-email">Email</Label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
@@ -342,9 +468,7 @@ export default function Auth() {
                     />
                   </div>
                 </div>
-                
-                {/* Password */}
-                <div>
+                <div className="space-y-2">
                   <Label htmlFor="register-password">Mật khẩu</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
@@ -354,7 +478,7 @@ export default function Auth() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="pl-10 pr-10"
-                      placeholder="••••••••"
+                      placeholder="•••••••• (tối thiểu 6 ký tự)"
                       required
                     />
                     <button

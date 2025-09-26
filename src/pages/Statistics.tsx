@@ -1,7 +1,7 @@
-
 /**
  * Statistics Page
  * Displays detailed learning progress, achievements, and analytics
+ * UPDATED: Fetch user stats from Firestore
  */
 
 import { useState, useEffect } from 'react'
@@ -20,15 +20,22 @@ import {
   BookOpen,
   Flame,
   Award,
-  BarChart3
+  BarChart3,
+  Loader2 // Icon cho trạng thái tải
 } from 'lucide-react'
 
+// 1. IMPORT CÁC THÀNH PHẦN FIREBASE & AUTH
+import { useAuth } from '../components/AuthProvider'
+// Giả định file firebase.ts nằm ở '../lib/firebase'
+import { getUserStatistics } from '../lib/firebase' 
+
+// 2. DEFINE INTERFACE VÀ INITIAL STATE
 interface LearningSession {
   date: string
   wordsLearned: number
   points: number
   accuracy: number
-  timeSpent: number
+  timeSpent: number // Giả định là phút hoặc giờ
 }
 
 interface Achievement {
@@ -41,298 +48,246 @@ interface Achievement {
   maxProgress?: number
 }
 
+// Interface cho dữ liệu thống kê người dùng từ Firestore
+interface UserStatistics {
+  totalPoints: number
+  streak: number
+  totalWordsLearned: number
+  totalTimeSpent: number // Đơn vị: giờ
+}
+
+const INITIAL_STATS: UserStatistics = {
+  totalPoints: 0,
+  streak: 0,
+  totalWordsLearned: 0,
+  totalTimeSpent: 0,
+}
+
 export default function Statistics() {
-  const [totalPoints, setTotalPoints] = useState<number>(1250)
-  const [streak, setStreak] = useState<number>(12)
-  const [totalWordsLearned, setTotalWordsLearned] = useState<number>(180)
-  const [totalTimeSpent, setTotalTimeSpent] = useState<number>(480) // minutes
-  const [weeklyProgress, setWeeklyProgress] = useState<number>(75)
+  // Lấy user và trạng thái loading của Auth
+  const { user, loading: authLoading } = useAuth()
   
-  const [learningSessions, setLearningSessions] = useState<LearningSession[]>([
-    { date: '2024-01-22', wordsLearned: 15, points: 120, accuracy: 85, timeSpent: 25 },
-    { date: '2024-01-21', wordsLearned: 12, points: 90, accuracy: 78, timeSpent: 20 },
-    { date: '2024-01-20', wordsLearned: 18, points: 150, accuracy: 92, timeSpent: 30 },
-    { date: '2024-01-19', wordsLearned: 10, points: 80, accuracy: 72, timeSpent: 18 },
-    { date: '2024-01-18', wordsLearned: 14, points: 110, accuracy: 88, timeSpent: 22 },
-    { date: '2024-01-17', wordsLearned: 16, points: 130, accuracy: 90, timeSpent: 28 },
-    { date: '2024-01-16', wordsLearned: 8, points: 60, accuracy: 65, timeSpent: 15 }
-  ])
+  // State mới để lưu trữ dữ liệu từ Firestore
+  const [stats, setStats] = useState<UserStatistics>(INITIAL_STATS)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const [achievements, setAchievements] = useState<Achievement[]>([
-    {
-      id: '1',
-      title: 'Người mới bắt đầu',
-      description: 'Hoàn thành phiên học đầu tiên',
-      icon: '🎯',
-      unlocked: true
-    },
-    {
-      id: '2',
-      title: 'Chuỗi 7 ngày',
-      description: 'Học tập liên tục 7 ngày',
-      icon: '🔥',
-      unlocked: true
-    },
-    {
-      id: '3',
-      title: 'Bậc thầy từ vựng',
-      description: 'Học 100 từ vựng',
-      icon: '📚',
-      unlocked: false,
-      progress: 80,
-      maxProgress: 100
-    },
-    {
-      id: '4',
-      title: 'Chuẩn xác 90%',
-      description: 'Đạt độ chính xác 90% trong 1 phiên',
-      icon: '🎖️',
-      unlocked: false,
-      progress: 85,
-      maxProgress: 90
-    },
-    {
-      id: '5',
-      title: 'Siêu não',
-      description: 'Học 500 từ vựng',
-      icon: '🧠',
-      unlocked: false,
-      progress: 180,
-      maxProgress: 500
+  // 3. LOGIC FETCH DỮ LIỆU TỪ FIRESTORE
+  useEffect(() => {
+    // Chỉ fetch nếu user đã có và Auth đã hoàn thành
+    if (!user || authLoading) {
+      if (!user && !authLoading) {
+        setLoading(false) // Dừng loading nếu người dùng chưa đăng nhập
+      }
+      return // Chờ Auth hoàn thành
     }
-  ])
 
-  const formatTime = (minutes: number) => {
-    const hours = Math.floor(minutes / 60)
-    const mins = minutes % 60
-    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`
+    const loadUserStats = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        // Gọi hàm từ firebase.ts để lấy dữ liệu
+        const userData = await getUserStatistics(user.id)
+        
+        if (userData) {
+          // Ánh xạ dữ liệu từ Firestore vào state
+          setStats({
+            totalPoints: userData.totalPoints || 0,
+            streak: userData.streak || 0,
+            totalWordsLearned: userData.totalWordsLearned || 0,
+            totalTimeSpent: userData.totalTimeSpent || 0, // Giả định đơn vị là giờ
+          })
+        } else {
+          console.warn('Không tìm thấy thống kê cho người dùng:', user.id)
+          setStats(INITIAL_STATS) 
+        }
+
+      } catch (e) {
+        console.error('Lỗi khi tải thống kê người dùng:', e)
+        setError('Không thể tải dữ liệu thống kê. Vui lòng thử lại.')
+        setStats(INITIAL_STATS)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadUserStats()
+  }, [user, authLoading])
+
+  // Dữ liệu mock cho các thành phần chưa được tích hợp (ví dụ: LearningSession)
+  const sessions: LearningSession[] = [
+    { date: '2024-05-18', wordsLearned: 15, points: 50, accuracy: 0.85, timeSpent: 15 },
+    { date: '2024-05-17', wordsLearned: 10, points: 30, accuracy: 0.90, timeSpent: 10 },
+    { date: '2024-05-16', wordsLearned: 20, points: 70, accuracy: 0.78, timeSpent: 20 },
+  ]
+  
+  // Dữ liệu mock cho thành tích
+  const achievements: Achievement[] = [
+    { id: '1', title: 'Học giả N5', description: 'Hoàn thành 100 từ N5.', icon: '🎓', unlocked: true },
+    { id: '2', title: 'Cú đêm', description: 'Học liên tục 7 ngày.', icon: '🦉', unlocked: true },
+    { id: '3', title: 'Chăm chỉ', description: 'Đạt 500 điểm.', icon: '💪', unlocked: false, progress: stats.totalPoints, maxProgress: 500 },
+    { id: '4', title: 'Vua Từ', description: 'Học 500 từ.', icon: '👑', unlocked: false, progress: stats.totalWordsLearned, maxProgress: 500 },
+  ]
+
+  // RENDER DỰA TRÊN TRẠNG THÁI LOADING
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] p-4">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <p className="mt-4 text-lg text-gray-600 dark:text-gray-400">Đang tải thống kê...</p>
+      </div>
+    )
   }
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('vi-VN', { 
-      weekday: 'short', 
-      month: 'short', 
-      day: 'numeric' 
-    })
+  if (error) {
+    return (
+      <div className="text-center p-8">
+          <h2 className="text-xl font-bold text-destructive">Lỗi tải dữ liệu</h2>
+          <p className="text-gray-600 dark:text-gray-400">{error}</p>
+      </div>
+    )
   }
 
-  const getAccuracyColor = (accuracy: number) => {
-    if (accuracy >= 90) return 'text-green-600'
-    if (accuracy >= 75) return 'text-yellow-600'
-    return 'text-red-600'
+  if (!user && !loading) {
+      return (
+          <div className="text-center p-8">
+              <h2 className="text-xl font-bold text-muted-foreground">Chưa đăng nhập</h2>
+              <p className="text-gray-600 dark:text-gray-400">Vui lòng đăng nhập để xem thống kê học tập của bạn.</p>
+          </div>
+      )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
-      <div className="max-w-md mx-auto">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">
-            Thống kê học tập
-          </h1>
-          <p className="text-gray-600 dark:text-gray-300">
-            Theo dõi tiến trình và thành tích của bạn
-          </p>
-        </div>
-
-        {/* Overview cards */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <Card className="bg-white dark:bg-gray-800 border-0 shadow-lg">
-            <CardHeader className="pb-2">
-              <CardDescription className="text-sm">Tổng điểm</CardDescription>
+    <div className="p-4 md:p-8 max-w-4xl mx-auto">
+      <div className="space-y-8">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Thống kê Học tập của {user?.name || user?.email}</h1>
+        
+        {/* THẺ TỔNG QUAN (Sử dụng dữ liệu từ stats) */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {/* Tổng điểm */}
+          <Card className="shadow-md transition-all duration-300 hover:shadow-lg">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Tổng điểm</CardTitle>
+              <TrendingUp className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="flex items-center space-x-2">
-                <Trophy className="h-5 w-5 text-yellow-500" />
-                <span className="text-2xl font-bold text-gray-800 dark:text-white">
-                  {totalPoints}
-                </span>
-              </div>
+              <div className="text-2xl font-bold">{stats.totalPoints.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground">Điểm tích lũy</p>
             </CardContent>
           </Card>
-
-          <Card className="bg-white dark:bg-gray-800 border-0 shadow-lg">
-            <CardHeader className="pb-2">
-              <CardDescription className="text-sm">Chuỗi ngày</CardDescription>
+          
+          {/* Chuỗi ngày học (Streak) */}
+          <Card className="shadow-md transition-all duration-300 hover:shadow-lg">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Chuỗi ngày học</CardTitle>
+              <Flame className="h-4 w-4 text-orange-500" />
             </CardHeader>
             <CardContent>
-              <div className="flex items-center space-x-2">
-                <Flame className="h-5 w-5 text-orange-500" />
-                <span className="text-2xl font-bold text-gray-800 dark:text-white">
-                  {streak}
-                </span>
-              </div>
+              <div className="text-2xl font-bold">{stats.streak} ngày</div>
+              <p className="text-xs text-muted-foreground">Không bị gián đoạn</p>
             </CardContent>
           </Card>
-
-          <Card className="bg-white dark:bg-gray-800 border-0 shadow-lg">
-            <CardHeader className="pb-2">
-              <CardDescription className="text-sm">Từ vựng đã học</CardDescription>
+          
+          {/* Tổng từ đã học */}
+          <Card className="shadow-md transition-all duration-300 hover:shadow-lg">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Từ đã học</CardTitle>
+              <BookOpen className="h-4 w-4 text-blue-500" />
             </CardHeader>
             <CardContent>
-              <div className="flex items-center space-x-2">
-                <BookOpen className="h-5 w-5 text-blue-500" />
-                <span className="text-2xl font-bold text-gray-800 dark:text-white">
-                  {totalWordsLearned}
-                </span>
-              </div>
+              <div className="text-2xl font-bold">{stats.totalWordsLearned.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground">Tổng số từ</p>
             </CardContent>
           </Card>
-
-          <Card className="bg-white dark:bg-gray-800 border-0 shadow-lg">
-            <CardHeader className="pb-2">
-              <CardDescription className="text-sm">Thời gian học</CardDescription>
+          
+          {/* Tổng thời gian */}
+          <Card className="shadow-md transition-all duration-300 hover:shadow-lg">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Tổng thời gian</CardTitle>
+              <Clock className="h-4 w-4 text-green-500" />
             </CardHeader>
             <CardContent>
-              <div className="flex items-center space-x-2">
-                <Clock className="h-5 w-5 text-purple-500" />
-                <span className="text-2xl font-bold text-gray-800 dark:text-white">
-                  {formatTime(totalTimeSpent)}
-                </span>
-              </div>
+              <div className="text-2xl font-bold">{stats.totalTimeSpent.toFixed(1)} giờ</div>
+              <p className="text-xs text-muted-foreground">Tổng thời gian học</p>
             </CardContent>
           </Card>
         </div>
 
-        <Tabs defaultValue="progress" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-6">
-            <TabsTrigger value="progress">Tiến trình</TabsTrigger>
+        {/* TABS VIEW */}
+        <Tabs defaultValue="sessions" className="w-full">
+          <TabsList className="grid w-full grid-cols-3 md:w-fit">
             <TabsTrigger value="sessions">Phiên học</TabsTrigger>
+            <TabsTrigger value="charts">Biểu đồ</TabsTrigger>
             <TabsTrigger value="achievements">Thành tích</TabsTrigger>
           </TabsList>
-
-          <TabsContent value="progress" className="space-y-4">
-            <Card className="bg-white dark:bg-gray-800 border-0 shadow-lg">
+          
+          {/* TAB: Phiên học */}
+          <TabsContent value="sessions" className="mt-6 space-y-4">
+            <Card className="shadow-lg">
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <BarChart3 className="h-5 w-5 text-indigo-500" />
-                  <span>Tuần này</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="text-gray-600 dark:text-gray-300">
-                        Hoàn thành mục tiêu
-                      </span>
-                      <span className="font-medium">{weeklyProgress}%</span>
-                    </div>
-                    <Progress value={weeklyProgress} className="h-2" />
-                  </div>
-                  
-                  <div className="grid grid-cols-3 gap-4 pt-4">
-                    <div className="text-center">
-                      <p className="text-lg font-bold text-blue-600">42</p>
-                      <p className="text-xs text-gray-500">Từ học</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-lg font-bold text-green-600">82%</p>
-                      <p className="text-xs text-gray-500">Độ chính xác</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-lg font-bold text-purple-600">6</p>
-                      <p className="text-xs text-gray-500">Ngày</p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white dark:bg-gray-800 border-0 shadow-lg">
-              <CardHeader>
-                <CardTitle>Thống kê theo trình độ</CardTitle>
+                <CardTitle>Các phiên học gần đây</CardTitle>
+                <CardDescription>Tổng quan về 3 phiên học cuối cùng của bạn</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">N5 (Cơ bản)</span>
-                    <div className="flex items-center space-x-2">
-                      <Progress value={70} className="w-20 h-2" />
-                      <span className="text-sm font-medium">70%</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">N4 (Trung cấp)</span>
-                    <div className="flex items-center space-x-2">
-                      <Progress value={30} className="w-20 h-2" />
-                      <span className="text-sm font-medium">30%</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">N3 (Nâng cao)</span>
-                    <div className="flex items-center space-x-2">
-                      <Progress value={5} className="w-20 h-2" />
-                      <span className="text-sm font-medium">5%</span>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="sessions" className="space-y-4">
-            <Card className="bg-white dark:bg-gray-800 border-0 shadow-lg">
-              <CardHeader>
-                <CardTitle>Lịch sử phiên học</CardTitle>
-                <CardDescription>
-                  7 ngày gần nhất
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {learningSessions.map((session, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                      <div>
+                  {sessions.map((session, index) => (
+                    <div key={index} className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                      <div className="space-y-1">
                         <p className="font-medium text-gray-800 dark:text-white">
-                          {formatDate(session.date)}
+                          Phiên học ngày {session.date}
                         </p>
                         <p className="text-sm text-gray-600 dark:text-gray-300">
-                          {session.wordsLearned} từ • {formatTime(session.timeSpent)}
+                          {session.wordsLearned} từ | {session.timeSpent} phút
                         </p>
                       </div>
-                      <div className="text-right">
-                        <p className="font-bold text-blue-600">{session.points} điểm</p>
-                        <p className={`text-sm ${getAccuracyColor(session.accuracy)}`}>
-                          {session.accuracy}%
-                        </p>
-                      </div>
+                      <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20">
+                        {Math.round(session.accuracy * 100)}% Chính xác
+                      </Badge>
                     </div>
                   ))}
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
-
-          <TabsContent value="achievements" className="space-y-4">
-            <Card className="bg-white dark:bg-gray-800 border-0 shadow-lg">
+          
+          {/* TAB: Biểu đồ (Mock) */}
+          <TabsContent value="charts" className="mt-6">
+            <Card className="shadow-lg">
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Award className="h-5 w-5 text-yellow-500" />
-                  <span>Thành tích đã đạt được</span>
-                </CardTitle>
+                <CardTitle>Biểu đồ Tiến độ</CardTitle>
+                <CardDescription>Đây là nơi hiển thị biểu đồ về sự tiến bộ của bạn.</CardDescription>
+              </CardHeader>
+              <CardContent className="h-64 flex items-center justify-center">
+                <BarChart3 className="h-12 w-12 text-muted-foreground/50" />
+                <p className="ml-4 text-lg text-muted-foreground">Đang phát triển...</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* TAB: Thành tích */}
+          <TabsContent value="achievements" className="mt-6 space-y-4">
+            {/* Thành tích Đã mở khóa */}
+            <Card className="shadow-lg">
+              <CardHeader>
+                <CardTitle>Đã mở khóa</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {achievements.filter(a => a.unlocked).map((achievement) => (
-                    <div key={achievement.id} className="flex items-center space-x-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                      <span className="text-2xl">{achievement.icon}</span>
+                    <div key={achievement.id} className="flex items-center space-x-3 p-3 bg-green-50/20 dark:bg-green-900/50 rounded-lg border border-green-500/50">
+                      <span className="text-3xl">{achievement.icon}</span>
                       <div className="flex-1">
-                        <p className="font-medium text-gray-800 dark:text-white">
-                          {achievement.title}
-                        </p>
-                        <p className="text-sm text-gray-600 dark:text-gray-300">
-                          {achievement.description}
-                        </p>
+                        <p className="font-bold text-green-700 dark:text-green-300">{achievement.title}</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-300">{achievement.description}</p>
                       </div>
-                      <Trophy className="h-5 w-5 text-yellow-500" />
                     </div>
                   ))}
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-white dark:bg-gray-800 border-0 shadow-lg">
+            {/* Thành tích Đang tiến hành */}
+            <Card className="shadow-lg">
               <CardHeader>
                 <CardTitle>Đang tiến hành</CardTitle>
               </CardHeader>
@@ -367,4 +322,3 @@ export default function Statistics() {
     </div>
   )
 }
-
