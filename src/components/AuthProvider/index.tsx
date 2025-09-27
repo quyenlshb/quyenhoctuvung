@@ -111,3 +111,5 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const contextValue = useMemo(() => value, [value])
   return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
 }
+// Thêm export AuthModal
+export { default as AuthModal } from './AuthModal'

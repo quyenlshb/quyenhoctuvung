@@ -18,15 +18,15 @@ import { AuthProvider, useAuthProvider, AuthModal } from './components/AuthProvi
 import { Toaster } from './components/ui/toaster'
 
 export default function App() {
-  // Khởi tạo context auth
+  // Lấy context auth
   const authContext = useAuthProvider()
 
   return (
     <AuthProvider value={authContext}>
       {/* Modal đăng nhập/đăng ký */}
-      <AuthModal
-        showAuthForm={authContext.showAuthForm}
-        setShowAuthForm={authContext.showAuthModal}
+      <AuthModal 
+        showAuthForm={authContext.showAuthForm} 
+        setShowAuthForm={authContext.showAuthModal} 
       />
 
       {/* Routes chung với Shell */}
@@ -40,7 +40,7 @@ export default function App() {
         </Route>
       </Routes>
 
-      {/* Toaster cho thông báo */}
+      {/* Toaster */}
       <Toaster />
     </AuthProvider>
   )
