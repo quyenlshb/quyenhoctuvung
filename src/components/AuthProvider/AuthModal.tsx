@@ -1,8 +1,5 @@
 // File: src/components/AuthProvider/AuthModal.tsx
-import { Dialog, DialogContent } from '../ui/dialog'
-import { DialogTitle } from '../ui/dialog-title'
-import { VisuallyHidden } from '../ui/visually-hidden'
-import { useAuth } from './index'
+import { Dialog, DialogContent, DialogTitle } from '../ui/dialog'
 import AuthForm from './AuthForm'
 
 interface AuthModalProps {
@@ -11,20 +8,16 @@ interface AuthModalProps {
 }
 
 export default function AuthModal({ showAuthForm, setShowAuthForm }: AuthModalProps) {
-  const { user } = useAuth()
-
   return (
     <Dialog open={showAuthForm} onOpenChange={setShowAuthForm}>
       <DialogContent
         className="sm:max-w-[425px] p-0 border-none bg-transparent shadow-none"
         onPointerDownOutside={(e) => {
           const protectedRoutes = ['/learn', '/vocabulary', '/statistics', '/settings']
-          if (protectedRoutes.includes(window.location.pathname) && !user) e.preventDefault()
+          if (protectedRoutes.includes(window.location.pathname)) e.preventDefault()
         }}
       >
-        <DialogTitle>
-          <VisuallyHidden>Đăng nhập hoặc đăng ký</VisuallyHidden>
-        </DialogTitle>
+        <DialogTitle className="sr-only">Đăng nhập hoặc đăng ký</DialogTitle>
         <AuthForm />
       </DialogContent>
     </Dialog>
