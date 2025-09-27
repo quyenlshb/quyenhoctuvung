@@ -4,13 +4,13 @@ import path from 'path'
 
 export default defineConfig({
   
-  // ✅ FIX QUAN TRỌNG: Sử dụng đường dẫn tương đối để Vercel tải đúng tài nguyên
+  // ✅ FIX QUAN TRỌNG: Sử dụng đường dẫn tương đối cho Vercel
   base: './', 
   
   plugins: [react()],
   
   resolve: {
-    // Đảm bảo alias @/* hoạt động với cấu hình tsconfig.json
+    // Đảm bảo alias @/* hoạt động
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
@@ -19,7 +19,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
-    // Tùy chọn: Xóa thư mục 'dist' trước khi build
+    // Đảm bảo thư mục 'dist' được dọn sạch trước khi build
     emptyOutDir: true 
   },
   server: {
