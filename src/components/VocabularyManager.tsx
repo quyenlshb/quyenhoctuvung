@@ -2,6 +2,7 @@
  * Vocabulary Manager Component
  * Handles adding, editing, and deleting vocabulary words and sets
  * Integrated with Firebase Firestore
+ * UPDATED: Bulk Import logic modified to only accept 3 fields (Kanji, Kana, Meaning)
  */
 
 import { useState, useEffect, useCallback } from 'react'
@@ -17,8 +18,6 @@ import {
   Plus, 
   Edit2, 
   Trash2, 
-  Save,
-  X,
   BookOpen,
   Hash,
   Loader2,
@@ -36,11 +35,12 @@ import {
   deleteVocabularySet, 
   addVocabularyWord, 
   updateVocabularyWord, 
-  deleteVocabularyWord 
+  deleteVocabularyWord,
+  addMultipleVocabularyWords 
 } from '../lib/firebase' 
 
 // ----------------------------------------------------
-// INTERFACES
+// INTERFACES (Giữ nguyên)
 // ----------------------------------------------------
 
 interface VocabularyWord {
@@ -56,8 +56,41 @@ interface VocabularySet {
   id: string
   name: string
   description?: string
-  wordCount: number // Thêm field này để hiển thị nhanh
+  wordCount: number 
 }
+
+// ----------------------------------------------------
+// HELPER: PARSER CHO BULK IMPORT (ĐÃ CHỈNH SỬA)
+// ----------------------------------------------------
+
+const parseBulkText = (text: string): { kanji: string, kana: string, meaning: string, notes: string, difficulty: number }[] => {
+    // Loại bỏ dòng trống và dòng comment (bắt đầu bằng // hoặc #)
+    const lines = text.trim().split('\n').filter(line => line.trim() !== '' && !line.trim().startsWith('//') && !line.trim().startsWith('#'));
+    
+    return lines.map(line => {
+        // Tách các trường bằng dấu cách hoặc nhiều khoảng trắng
+        const parts = line.trim().split(/\s+/); 
+        
+        // ✅ CHỈ CẦN 3 TRƯỜNG: kanji, kana, meaning
+        if (parts.length < 3) {
+            return null;
+        }
+        
+        let kanji = parts[0] || '';
+        let kana = parts[1] || '';
+        let meaning = parts[2] || '';
+        // ✅ GHI CHÚ LUÔN LÀ RỖNG, BỎ QUA CÁC TRƯỜNG THỨ 4 TRỞ ĐI CỦA INPUT
+        let notes = ''; 
+        
+        return {
+            kanji: kanji.trim(),
+            kana: kana.trim(),
+            meaning: meaning.trim(),
+            notes: notes, 
+            difficulty: 50 // Giá trị mặc định
+        };
+    }).filter((word): word is { kanji: string, kana: string, meaning: string, notes: string, difficulty: number } => word !== null);
+};
 
 // ----------------------------------------------------
 // MAIN COMPONENT
@@ -65,7 +98,7 @@ interface VocabularySet {
 
 export default function VocabularyManager() {
   const { user } = useAuth()
-  const userId = user?.id // Lấy ID người dùng hiện tại
+  const userId = user?.id 
   
   const [sets, setSets] = useState<VocabularySet[]>([])
   const [selectedSet, setSelectedSet] = useState<VocabularySet | null>(null)
@@ -74,7 +107,6 @@ export default function VocabularyManager() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
-  // State cho Modal/Dialog
   const [isSetDialogOpen, setIsSetDialogOpen] = useState(false)
   const [isWordDialogOpen, setIsWordDialogOpen] = useState(false)
   const [editingSet, setEditingSet] = useState<VocabularySet | null>(null)
@@ -82,10 +114,9 @@ export default function VocabularyManager() {
   const [wordFormLoading, setWordFormLoading] = useState(false);
 
   // ----------------------------------------------------
-  // HÀM FETCH DỮ LIỆU
+  // HÀM FETCH DỮ LIỆU (Giữ nguyên)
   // ----------------------------------------------------
 
-  // Fetch tất cả các bộ từ của người dùng
   const fetchSets = useCallback(async () => {
     if (!userId) return
     setIsLoading(true)
@@ -101,36 +132,13 @@ export default function VocabularyManager() {
     }
   }, [userId])
   
-  // Fetch từ vựng khi chọn một set
   const fetchWordsForSet = useCallback(async (setId: string) => {
     if (!userId) return
     setIsLoading(true)
     setError(null)
     try {
-        const fetchedSets = await getVocabularySets(userId)
-        const currentSet = fetchedSets.find(s => s.id === setId);
-        // Do hàm getVocabularySets hiện tại trả về set không có Words, 
-        // ta giả định rằng hàm getVocabularySets đã được chỉnh sửa để trả về Word Count
-        // và sẽ tải Words riêng.
-        
-        // GIẢ ĐỊNH: Nếu bạn đã chỉnh sửa `getVocabularySets` để bao gồm words, hãy dùng nó. 
-        // Nếu không, chúng ta cần một hàm mới: getVocabularyWords(userId, setId)
-        
-        // TẠM THỜI: Ta cần một hàm getWords từ firebase.ts (chưa có)
-        // Vì chưa có, ta tạm dùng dữ liệu mock để UI không bị vỡ.
-        // Tuy nhiên, để bài tập này hoàn chỉnh, ta cần thêm hàm này vào firebase.ts
-        
-        // Do đây là bước 4/5, tôi sẽ giả định file firebase.ts đã có hàm này
-        // *******************************************************************
-        // LƯU Ý QUAN TRỌNG: BẠN CẦN THÊM CÁC HÀM GET/ADD/UPDATE/DELETE WORDS VÀO `../lib/firebase.ts`
-        // *******************************************************************
-        
-        // Vì chưa có hàm getWords, chúng ta sẽ TẠM THỜI chỉ hiển thị bộ từ.
-        // Nếu bạn muốn tiếp tục, vui lòng cung cấp nội dung `firebase.ts` để tôi thêm các hàm Words.
-        
-        // Tạm thời, tôi sẽ hiển thị một thông báo thay vì fetch words:
-        setWords([]); 
-        
+        const fetchedWords = await getVocabularyWords(userId, setId); 
+        setWords(fetchedWords);
     } catch (err) {
       setError("Không thể tải từ vựng cho bộ từ này.");
       console.error(err)
@@ -145,7 +153,7 @@ export default function VocabularyManager() {
   }, [fetchSets])
   
   // ----------------------------------------------------
-  // HÀM XỬ LÝ SETS
+  // HÀM XỬ LÝ SETS (Giữ nguyên)
   // ----------------------------------------------------
 
   const handleSetFormSubmit = async (name: string, description: string) => {
@@ -193,11 +201,11 @@ export default function VocabularyManager() {
   
   const handleSetSelect = (set: VocabularySet) => {
     setSelectedSet(set)
-    fetchWordsForSet(set.id); // Tải từ vựng khi chọn set
+    fetchWordsForSet(set.id); 
   }
 
   // ----------------------------------------------------
-  // HÀM XỬ LÝ WORDS
+  // HÀM XỬ LÝ WORDS (Giữ nguyên logic chính)
   // ----------------------------------------------------
   
   const handleWordFormSubmit = async (data: { kanji: string, kana: string, meaning: string, notes: string }) => {
@@ -214,19 +222,18 @@ export default function VocabularyManager() {
             notes: data.notes 
         })
       } else {
-        // ADD NEW WORD
+        // ADD NEW WORD (Single)
         await addVocabularyWord(userId, selectedSet.id, { 
             kanji: data.kanji, 
             kana: data.kana, 
             meaning: data.meaning, 
             notes: data.notes,
-            difficulty: 50 // Mặc định
+            difficulty: 50 
         })
       }
       
       setIsWordDialogOpen(false)
       setEditingWord(null)
-      // Tải lại từ vựng và sets
       await fetchWordsForSet(selectedSet.id) 
       await fetchSets() 
       
@@ -236,6 +243,41 @@ export default function VocabularyManager() {
       setWordFormLoading(false)
     }
   }
+  
+  // HÀM XỬ LÝ BULK IMPORT MỚI
+  const handleBulkImport = async (bulkText: string) => {
+    if (!userId || !selectedSet) return;
+    setWordFormLoading(true);
+    setError(null);
+    
+    const newWords = parseBulkText(bulkText);
+    
+    if (newWords.length === 0) {
+        setError("Không có từ vựng hợp lệ nào được tìm thấy. Định dạng yêu cầu: [Kanji/Từ] [Kana/Đọc] [Nghĩa]");
+        setWordFormLoading(false);
+        return;
+    }
+    
+    try {
+        const addedCount = await addMultipleVocabularyWords(userId, selectedSet.id, newWords); 
+        
+        setIsWordDialogOpen(false);
+        setEditingWord(null);
+        
+        if (addedCount > 0) {
+            // Tải lại từ vựng và sets chỉ khi có từ được thêm
+            await fetchWordsForSet(selectedSet.id); 
+            await fetchSets(); 
+        } else {
+            setError("Không có từ nào được thêm. Vui lòng kiểm tra lại định dạng.");
+        }
+        
+    } catch (err: any) {
+        setError(err.message || "Thao tác nhập danh sách từ vựng thất bại. Vui lòng thử lại.");
+    } finally {
+        setWordFormLoading(false);
+    }
+  };
 
   const handleDeleteWord = async (setId: string, wordId: string) => {
     if (!userId) return
@@ -246,9 +288,8 @@ export default function VocabularyManager() {
     try {
       await deleteVocabularyWord(userId, setId, wordId)
       
-      // Tải lại từ vựng và sets
-      await fetchWordsForSet(setId) 
-      await fetchSets() 
+      setWords(prev => prev.filter(w => w.id !== wordId));
+      await fetchSets(); 
       
     } catch (err) {
       setError("Xóa từ vựng thất bại.");
@@ -259,7 +300,7 @@ export default function VocabularyManager() {
 
 
   // ----------------------------------------------------
-  // COMPONENTS NỘI BỘ: SET FORM
+  // COMPONENTS NỘI BỘ: SET FORM (Giữ nguyên)
   // ----------------------------------------------------
   
   const SetForm = () => {
@@ -274,7 +315,6 @@ export default function VocabularyManager() {
         return
       }
       setFormError(null)
-      // Bắt đầu submit, isLoading sẽ được kiểm soát ở component cha (VocabularyManager)
       handleSetFormSubmit(name, description)
     }
 
@@ -314,7 +354,7 @@ export default function VocabularyManager() {
   }
   
   // ----------------------------------------------------
-  // COMPONENTS NỘI BỘ: WORD FORM
+  // COMPONENTS NỘI BỘ: WORD FORM (Single Entry - Giữ nguyên)
   // ----------------------------------------------------
   
   const WordForm = () => {
@@ -348,6 +388,7 @@ export default function VocabularyManager() {
           <Label htmlFor="word-meaning">Nghĩa tiếng Việt</Label>
           <Input id="word-meaning" value={meaning} onChange={(e) => setMeaning(e.target.value)} placeholder="Ví dụ" required disabled={wordFormLoading} />
         </div>
+        {/* Giữ lại trường Ghi chú cho nhập tay */}
         <div className="space-y-2">
           <Label htmlFor="word-notes">Ghi chú / Ví dụ</Label>
           <Textarea 
@@ -364,14 +405,69 @@ export default function VocabularyManager() {
         {error && <p className="text-red-500 text-sm">{error}</p>}
         
         <Button type="submit" className="w-full" disabled={wordFormLoading}>
-          {wordFormLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : editingWord ? 'Cập nhật Từ vựng' : 'Thêm Từ vựng mới'}
+          {wordFormLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : editingWord ? 'Cập nhật Từ vựng' : 'Thêm Từ vựng'}
         </Button>
       </form>
     )
   }
-
+  
   // ----------------------------------------------------
-  // RENDER CHÍNH
+  // COMPONENTS NỘI BỘ: BULK WORD FORM (ĐÃ CHỈNH SỬA)
+  // ----------------------------------------------------
+  
+  const BulkWordForm = () => {
+    const [bulkText, setBulkText] = useState('');
+    const [formError, setFormError] = useState<string | null>(null);
+    const parsedWordsCount = parseBulkText(bulkText).length;
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setFormError(null);
+        if (parsedWordsCount === 0) {
+            setFormError("Vui lòng dán danh sách từ vựng hợp lệ.");
+            return;
+        }
+        
+        await handleBulkImport(bulkText);
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-4 p-4">
+            <div className="space-y-2">
+                <Label htmlFor="bulk-import-area">Dán danh sách từ vựng</Label>
+                <Textarea
+                    id="bulk-import-area"
+                    value={bulkText}
+                    onChange={(e) => setBulkText(e.target.value)}
+                    // ✅ CẬP NHẬT PLACEHOLDER
+                    placeholder="Ví dụ:\n\n本 ほん Sách\n食べる たべる Ăn" 
+                    rows={8}
+                    required
+                    disabled={wordFormLoading}
+                />
+            </div>
+            
+            {/* ✅ CẬP NHẬT MÔ TẢ ĐỊNH DẠNG */}
+            <p className="text-sm text-gray-500 dark:text-gray-400 p-3 bg-gray-100 dark:bg-gray-700 rounded-md">
+                **Định dạng bắt buộc**: Mỗi từ một dòng. Các trường phân tách bằng **dấu cách**.<br/>
+                `[Kanji/Từ] [Kana/Đọc] [Nghĩa TV]` (Chỉ chấp nhận tối đa 3 trường)
+            </p>
+
+            {formError && <p className="text-red-500 text-sm">{formError}</p>}
+            {error && <p className="text-red-500 text-sm">{error}</p>}
+            
+            <Button type="submit" className="w-full" disabled={wordFormLoading || parsedWordsCount === 0}>
+                {wordFormLoading 
+                    ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> 
+                    : `Nhập ${parsedWordsCount} Từ vựng`
+                }
+            </Button>
+        </form>
+    );
+  };
+  
+  // ----------------------------------------------------
+  // RENDER CHÍNH (Giữ nguyên)
   // ----------------------------------------------------
 
   if (!user) {
@@ -489,28 +585,45 @@ export default function VocabularyManager() {
             <Card className="shadow-lg">
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="truncate">Từ vựng trong: {selectedSet.name}</CardTitle>
+                
+                {/* DIALOG MỚI VỚI TABS */}
                 <Dialog open={isWordDialogOpen} onOpenChange={(open) => {
                   setIsWordDialogOpen(open)
                   if (!open) setEditingWord(null)
                 }}>
                   <DialogTrigger asChild>
-                    <Button size="sm" onClick={() => setEditingWord(null)} disabled={wordFormLoading}>
+                    <Button size="sm" disabled={wordFormLoading}>
                       <Plus className="h-4 w-4 mr-2" /> Thêm Từ
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                      <DialogTitle>{editingWord ? 'Chỉnh sửa Từ vựng' : 'Thêm Từ vựng mới'}</DialogTitle>
-                    </DialogHeader>
-                    <WordForm />
+                  <DialogContent className="sm:max-w-[480px] p-0"> 
+                    <Tabs defaultValue="single">
+                      <DialogHeader className='p-6 pb-0'>
+                        <DialogTitle>
+                          {editingWord ? 'Chỉnh sửa Từ vựng' : 'Thêm Từ vựng mới'}
+                        </DialogTitle>
+                      </DialogHeader>
+                      <TabsList className="grid w-full grid-cols-2 h-10 px-4">
+                        <TabsTrigger value="single" disabled={!!editingWord}>Thêm từng từ</TabsTrigger>
+                        <TabsTrigger value="bulk" disabled={!!editingWord}>Nhập danh sách</TabsTrigger>
+                      </TabsList>
+                      
+                      <TabsContent value="single">
+                        <WordForm />
+                      </TabsContent>
+                      
+                      <TabsContent value="bulk">
+                        <BulkWordForm />
+                      </TabsContent>
+                    </Tabs>
                   </DialogContent>
                 </Dialog>
+                
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">{selectedSet.description || 'Không có mô tả.'}</p>
                 <div className="space-y-3 max-h-[50vh] overflow-y-auto">
                     
-                  {/* GIẢ ĐỊNH: words được tải từ fetchWordsForSet */}
                   {words.length === 0 ? (
                     <div className="text-center py-8">
                        <List className="h-10 w-10 text-gray-400 mx-auto mb-3" />
@@ -576,7 +689,7 @@ export default function VocabularyManager() {
       </div>
       
       <p className="mt-8 text-sm text-center text-gray-500 dark:text-gray-400">
-        **LƯU Ý**: Để các chức năng thêm/sửa/xóa Từ vựng hoạt động, bạn cần đảm bảo các hàm `addVocabularyWord`, `updateVocabularyWord`, `deleteVocabularyWord`, và một hàm để tải từ vựng cho Set (`getVocabularyWords`) đã có trong `../lib/firebase.ts`.
+        **LƯU Ý**: Chức năng **Nhập danh sách** sẽ không khả dụng khi bạn đang **Chỉnh sửa** một từ vựng có sẵn.
       </p>
     </div>
   )
