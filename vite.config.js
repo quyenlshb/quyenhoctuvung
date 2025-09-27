@@ -1,9 +1,9 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import path from 'path' // Cần cho alias
+import path from 'path' 
 
 export default defineConfig({
-  // ✅ THÊM DÒNG NÀY: Đảm bảo đường dẫn tài sản tương đối với thư mục gốc.
+  // ✅ THÊM DÒNG NÀY
   base: './', 
   
   plugins: [react()],
