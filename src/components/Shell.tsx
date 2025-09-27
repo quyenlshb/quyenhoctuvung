@@ -4,9 +4,11 @@ import { useState, useEffect } from 'react';
 
 import { useIsMobile } from '../hooks/use-mobile.tsx';
 import { Button } from './ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card'; // Import Card components
 import { useAuth } from './AuthProvider'; 
 
 export default function Shell() {
+  // Lấy thêm showAuthModal và showAuthForm
   const { user, logout, showAuthModal, loading, showAuthForm } = useAuth(); 
   const isMobile = useIsMobile();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -22,21 +24,24 @@ export default function Shell() {
   const isProtected = protectedRoutes.includes(location.pathname);
 
 
-  // LOGIC BẢO VỆ ROUTE VÀ HIỂN THỊ AUTH MODAL
+  // ✅ ĐIỀU CHỈNH LOGIC BẢO VỆ ROUTE VÀ HIỂN THỊ AUTH MODAL
   useEffect(() => {
-    // Nếu không trong quá trình tải, người dùng chưa đăng nhập, và đang ở trang bảo vệ:
+    // Logic: Nếu không trong quá trình tải, người dùng chưa đăng nhập, và đang ở trang bảo vệ:
     if (!loading && !user && isProtected) {
-      showAuthModal(true); // Hiển thị modal đăng nhập
-    } else if (user && isProtected) {
-      // Nếu đã đăng nhập và đang ở trang bảo vệ, đảm bảo modal bị ẩn
+      // Chỉ gọi showAuthModal(true)
+      showAuthModal(true); 
+    } else if (user && isProtected && showAuthForm) {
+      // Nếu đã đăng nhập và đang ở trang bảo vệ, nhưng modal vẫn mở (trường hợp user vừa đăng nhập thành công):
       showAuthModal(false); 
     }
     
-    // Nếu chuyển đến trang không được bảo vệ, đảm bảo modal bị ẩn (nếu nó không bị chặn đóng)
+    // Nếu chuyển đến trang không được bảo vệ, đảm bảo modal bị ẩn
     if (!isProtected && showAuthForm) {
         showAuthModal(false);
     }
-  }, [loading, user, isProtected, showAuthModal, location.pathname, showAuthForm]); // Thêm showAuthForm vào dependency
+    // Ghi chú: Thêm showAuthForm vào dependency để fix lỗi
+  }, [loading, user, isProtected, showAuthModal, location.pathname, showAuthForm]); 
+
 
   // Logic Nav Items (giữ nguyên)
   const navItems = [
@@ -49,11 +54,11 @@ export default function Shell() {
 
   // LOGIC ĐIỀU KIỆN RENDER
   // Chỉ render Outlet nếu: Quá trình tải kết thúc VÀ (Route KHÔNG bảo vệ HOẶC Người dùng ĐÃ đăng nhập)
-  // và Auth Modal KHÔNG đang mở khi ở protected route
-  const shouldRenderOutlet = !loading && (!isProtected || user) && (!isProtected || !showAuthForm);
+  const shouldRenderOutlet = !loading && (!isProtected || user);
   
   
-  // Mobile Menu UI 
+  // ... (MobileMenu và Sidebar giữ nguyên) ...
+  // Mobile Menu UI (Giữ nguyên)
   const MobileMenu = ({ navItems, isMenuOpen, setIsMenuOpen, handleLogout, user }: any) => (
     <div 
         className={`fixed inset-0 z-40 lg:hidden transition-opacity duration-300 ${isMenuOpen ? 'opacity-100 visible' : 'opacity-0 invisible'}`}
@@ -85,9 +90,12 @@ export default function Shell() {
                             </div>
                         </div>
                     ) : (
-                        <div className="text-sm text-gray-500">
-                            Vui lòng đăng nhập
-                        </div>
+                        <Button onClick={() => {
+                          showAuthModal(true);
+                          setIsMenuOpen(false);
+                        }} className="w-full">
+                            <UserIcon className="h-4 w-4 mr-2" /> Đăng nhập
+                        </Button>
                     )}
                 </div>
             
@@ -128,7 +136,7 @@ export default function Shell() {
     </div>
   )
 
-  // Sidebar Desktop UI 
+  // Sidebar Desktop UI (Giữ nguyên)
   const Sidebar = ({ navItems, handleLogout, user }: any) => (
     <div className="hidden lg:flex lg:flex-shrink-0">
       <div className="flex flex-col w-64 border-r dark:border-gray-800 bg-white dark:bg-gray-900">
@@ -197,7 +205,7 @@ export default function Shell() {
   )
 
 
-  // Header Mobile UI 
+  // Header Mobile UI (Giữ nguyên)
   const HeaderMobile = ({ isMobile, isMenuOpen, setIsMenuOpen, user }: any) => {
     if (!isMobile) return null;
     return (
@@ -256,7 +264,8 @@ export default function Shell() {
             </div>
           ) : (
              // Khi người dùng chưa đăng nhập, ở protected route
-             isProtected && !user && showAuthForm ? (
+             isProtected && !user ? (
+                // ✅ RENDER CARD YÊU CẦU ĐĂNG NHẬP (TRÁNH RENDER LẠI NẾU MODAL ĐANG MỞ)
                 <div className="flex h-full items-center justify-center p-8">
                     <Card className="text-center shadow-lg w-full max-w-sm">
                         <CardHeader>
@@ -269,7 +278,7 @@ export default function Shell() {
                     </Card>
                 </div>
              ) : (
-                // Nếu đang ở trang không bảo vệ
+                // Nếu đang ở trang không bảo vệ (ví dụ: /)
                 <div className={`p-4 md:p-8 ${isMobile ? 'pt-20' : ''}`}>
                     <Outlet /> 
                 </div>

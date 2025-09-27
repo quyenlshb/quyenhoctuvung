@@ -33,7 +33,7 @@ import {
   onAuthStateChanged,
   saveUserData, 
   getUserData 
-} from '../lib/firebase' // Đảm bảo đường dẫn này là chính xác
+} from '../lib/firebase' 
 
 interface User {
   id: string
@@ -76,6 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
   
+  // ✅ Dùng state này để kiểm soát trạng thái MỞ/ĐÓNG của Dialog
   const [showAuthForm, setShowAuthForm] = useState(false);
 
   // ----------------------------------------------------
@@ -86,11 +87,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     try {
-      setLoading(true)
       setError(null)
       const userCredential = await signInWithEmailAndPassword(auth, email, password)
       const userData = await getUserData(userCredential.user.uid)
-      setUser({
+      
+      const updatedUser: User = {
           id: userCredential.user.uid,
           email: userCredential.user.email || '',
           name: userData?.name || 'Người dùng',
@@ -98,22 +99,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           totalPoints: userData?.totalPoints,
           streak: userData?.streak,
           totalWords: userData?.totalWords || 0
-      })
+      }
+      
+      setUser(updatedUser)
+      // 🔥 FIX QUAN TRỌNG: Đóng modal TRƯỚC KHI chuyển hướng
       setShowAuthForm(false); 
       navigate('/') 
     } catch (err: any) {
-      // Thay đổi cách xử lý lỗi để form có thể bắt lỗi cụ thể
       const firebaseError = err.code ? "Đăng nhập thất bại. Vui lòng kiểm tra email và mật khẩu." : "Lỗi không xác định."
       setError(firebaseError)
       throw new Error(firebaseError)
-    } finally {
-      setLoading(false)
-    }
+    } 
   }
   
   const register = async (name: string, email: string, password: string) => {
     try {
-      setLoading(true)
       setError(null)
       const userCredential = await createUserWithEmailAndPassword(auth, email, password)
       
@@ -133,20 +133,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       
       setUser(newUser)
+      // 🔥 FIX QUAN TRỌNG: Đóng modal TRƯỚC KHI chuyển hướng
       setShowAuthForm(false); 
       navigate('/') 
     } catch (err: any) {
        const firebaseError = err.code ? "Đăng ký thất bại. Email đã được sử dụng hoặc mật khẩu quá yếu (dưới 6 ký tự)." : "Lỗi không xác định."
        setError(firebaseError)
        throw new Error(firebaseError)
-    } finally {
-      setLoading(false)
     }
   }
 
   const loginWithGoogle = async () => {
     try {
-      setLoading(true)
       setError(null)
       const result = await signInWithPopup(auth, googleProvider)
       const firebaseUser = result.user
@@ -182,13 +180,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
       }
       
+      // 🔥 FIX QUAN TRỌNG: Đóng modal TRƯỚC KHI chuyển hướng
       setShowAuthForm(false); 
       navigate('/')
     } catch (err) {
       setError("Đăng nhập bằng Google thất bại.");
       throw new Error("Đăng nhập bằng Google thất bại.");
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -256,7 +253,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
       
       {/* RENDER AUTH MODAL Ở ĐÂY */}
-      <Dialog open={showAuthForm} onOpenChange={setShowAuthForm}>
+      <Dialog 
+        open={showAuthForm} 
+        onOpenChange={setShowAuthForm} // ✅ Dùng trực tiếp setShowAuthForm
+      >
         <DialogContent 
             className="sm:max-w-[425px] p-0 border-none bg-transparent shadow-none"
             onPointerDownOutside={(e) => {
@@ -264,7 +264,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               const protectedRoutes = ['/learn', '/vocabulary', '/statistics', '/settings']; 
               const currentPath = window.location.pathname
               
-              if (protectedRoutes.includes(currentPath)) {
+              // Nếu đang ở protected route VÀ chưa đăng nhập (ngăn đóng để user đăng nhập)
+              if (protectedRoutes.includes(currentPath) && !user) {
                   e.preventDefault()
               }
             }}
@@ -294,7 +295,7 @@ function Auth() {
   const [error, setError] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [currentTab, setCurrentTab] = useState<'login' | 'register'>('login')
-  const [isFormLoading, setIsFormLoading] = useState(false) // ✅ Đổi tên biến loading cho form
+  const [isFormLoading, setIsFormLoading] = useState(false) 
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -303,7 +304,7 @@ function Auth() {
     try {
       await login(email, password)
     } catch (err: any) {
-      setError(err.message) // Bắt lỗi từ hàm login
+      setError(err.message) 
     } finally {
       setIsFormLoading(false)
     }
@@ -321,7 +322,7 @@ function Auth() {
     try {
       await register(name, email, password)
     } catch (err: any) {
-      setError(err.message) // Bắt lỗi từ hàm register
+      setError(err.message) 
     } finally {
       setIsFormLoading(false)
     }
@@ -333,7 +334,7 @@ function Auth() {
     try {
         await loginWithGoogle()
     } catch (err: any) {
-        setError(err.message) // Bắt lỗi từ hàm loginWithGoogle
+        setError(err.message) 
     } finally {
         setIsFormLoading(false)
     }
@@ -342,6 +343,7 @@ function Auth() {
   return (
     <Card className="w-full max-w-sm mx-auto shadow-2xl border-0">
       <CardHeader className="p-6">
+        {/* ... (UI giữ nguyên) ... */}
         <CardTitle className="text-2xl font-bold text-center">
           {currentTab === 'login' ? 'Chào mừng trở lại' : 'Tạo tài khoản mới'}
         </CardTitle>
