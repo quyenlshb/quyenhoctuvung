@@ -1,7 +1,7 @@
 /**
  * Firebase Integration Layer
  * Pre-configured Firebase setup ready for production deployment
- * Cập nhật: Hàm addVocabularySet trả về đối tượng bộ từ mới.
+ * Cập nhật: Hàm addVocabularySet đã thêm trường totalWords=0 vào payload ghi DB.
  */
 
 // 1. IMPORT CÁC MODULE FIREBASE CẦN THIẾT
@@ -56,7 +56,7 @@ export const googleProvider = new GoogleAuthProvider();
 export { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, signInWithPopup, Timestamp };
 
 // ----------------------------------------------------
-// INTERFACES (Được định nghĩa lại để các component khác import)
+// INTERFACES (Giữ nguyên)
 // ----------------------------------------------------
 
 export interface User {
@@ -98,7 +98,7 @@ export interface LearningSessionHistory {
 }
 
 // ----------------------------------------------------
-// FIRESTORE USER DATA
+// FIRESTORE USER DATA (Giữ nguyên)
 // ----------------------------------------------------
 
 /**
@@ -150,11 +150,11 @@ export const getUserData = async (userId: string): Promise<User | null> => {
 };
 
 // ----------------------------------------------------
-// FIRESTORE VOCABULARY SETS (ĐÃ SỬA CHỮA)
+// FIRESTORE VOCABULARY SETS
 // ----------------------------------------------------
 
 /**
- * Tải danh sách bộ từ vựng của người dùng
+ * Tải danh sách bộ từ vựng của người dùng (Đường dẫn Subcollection đã đúng)
  */
 export const getVocabularySets = async (userId: string): Promise<VocabularySet[]> => {
   try {
@@ -173,6 +173,7 @@ export const getVocabularySets = async (userId: string): Promise<VocabularySet[]
 
 /**
  * ✅ ĐÃ SỬA CHỮA: Thêm bộ từ vựng mới và trả về đối tượng bộ từ đã có ID.
+ * ⚡️ FIX: Đảm bảo trường totalWords: 0 (hoặc wordCount: 0) được thêm vào payload ghi DB.
  * @returns Đối tượng VocabularySet vừa được tạo (cùng với ID)
  */
 export const addVocabularySet = async (
@@ -182,21 +183,21 @@ export const addVocabularySet = async (
 ): Promise<VocabularySet> => {
   try {
     // Chuẩn bị dữ liệu bộ từ mới
-    const newSet: Omit<VocabularySet, 'id' | 'totalWords'> = {
+    const newSet = { // ⚡️ SỬA 1: KHÔNG DÙNG Omit<..., 'totalWords'> NỮA
       name,
       description,
       userId,
       createdAt: Timestamp.now(),
+      totalWords: 0, // ⚡️ SỬA 2: THÊM TRƯỜNG TOTALWORDS VÀO PAYLOAD GHI DB
     };
 
     // Ghi dữ liệu vào Firestore
     const newSetRef = await addDoc(collection(db, 'users', userId, 'vocabularySets'), newSet);
 
-    // Trả về đối tượng hoàn chỉnh bao gồm ID và totalWords = 0
+    // Trả về đối tượng hoàn chỉnh bao gồm ID
     return { 
       id: newSetRef.id, 
       ...newSet, 
-      totalWords: 0 
     } as VocabularySet; 
   } catch (error) {
     console.error('Error adding vocabulary set:', error);
@@ -205,7 +206,7 @@ export const addVocabularySet = async (
 };
 
 /**
- * Cập nhật thông tin bộ từ
+ * Cập nhật thông tin bộ từ (Đường dẫn Subcollection đã đúng)
  */
 export const updateVocabularySet = async (
   userId: string, 
@@ -222,7 +223,7 @@ export const updateVocabularySet = async (
 };
 
 /**
- * Xóa bộ từ vựng và toàn bộ từ vựng của nó (Không cần xóa từ vựng con, Firestore Rules sẽ xử lý)
+ * Xóa bộ từ vựng (Đường dẫn Subcollection đã đúng)
  */
 export const deleteVocabularySet = async (userId: string, setId: string) => {
   try {
@@ -237,7 +238,7 @@ export const deleteVocabularySet = async (userId: string, setId: string) => {
 };
 
 // ----------------------------------------------------
-// FIRESTORE VOCABULARY WORDS
+// FIRESTORE VOCABULARY WORDS (Đường dẫn Subcollection đã đúng)
 // ----------------------------------------------------
 
 /**
@@ -310,7 +311,7 @@ addVocabularyWord.bulk = async (
     const newWordRef = doc(wordsRef); // Tạo reference với ID mới
     const newWord = {
       ...wordData,
-      difficulty: 0, 
+      difficulty: 0,  
       lastReviewed: now,
     };
     
@@ -449,7 +450,7 @@ export const getLearningSessions = async (userId: string): Promise<LearningSessi
 }
 
 // ----------------------------------------------------
-// FIRESTORE STATISTICS
+// FIRESTORE STATISTICS (Giữ nguyên)
 // ----------------------------------------------------
 export const updateUserStatistics = async (userId: string, stats: any) => {
   try {
