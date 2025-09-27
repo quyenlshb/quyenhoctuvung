@@ -1,30 +1,21 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Sidebar from './components/Sidebar';
-import Home from './pages/Home';
-// import các page khác khi cần
-// import Learn from './components/LearningMode';
-// import Vocabulary from './components/VocabularyManager';
+import React from "react";
+import { Routes, Route } from "react-router-dom";
+import { Home } from "./pages/Home";
+import { Settings } from "./pages/Settings";
+import { Statistics } from "./pages/Statistics";
+import { AuthProvider } from "./components/AuthProvider";
+import { Shell } from "./components/Shell";
 
-function App() {
+export default function App() {
   return (
-    <Router>
-      <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
-        {/* Sidebar bên trái */}
-        <Sidebar />
-
-        {/* Nội dung chính */}
-        <div className="flex-1 p-4">
-          <Routes>
-            <Route path="/" element={<Home />} />
-            {/* Các route khác */}
-            {/* <Route path="/learn" element={<Learn />} /> */}
-            {/* <Route path="/vocabulary" element={<Vocabulary />} /> */}
-          </Routes>
-        </div>
-      </div>
-    </Router>
+    <AuthProvider>
+      <Shell>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/statistics" element={<Statistics />} />
+        </Routes>
+      </Shell>
+    </AuthProvider>
   );
 }
-
-export default App;

@@ -1,20 +1,16 @@
-// src/main.tsx
-import React from 'react'
-import { createRoot } from 'react-dom/client'
-import { BrowserRouter } from 'react-router-dom'
-import App from './App'
-import './shadcn.css' // đường dẫn chính xác như bạn nói
+import React from "react";
+import { createRoot } from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
+import App from "./App";
+import "./shadcn.css"; // Đúng đường dẫn
 
-const container = document.getElementById('root')
-if (!container) {
-  throw new Error('Root container not found')
-}
+const container = document.getElementById("root");
+const root = createRoot(container!);
 
-const root = createRoot(container)
 root.render(
   <React.StrictMode>
     <BrowserRouter>
       <App />
     </BrowserRouter>
   </React.StrictMode>
-)
+);

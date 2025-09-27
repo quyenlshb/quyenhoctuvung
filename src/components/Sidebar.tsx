@@ -1,46 +1,36 @@
-// src/components/Sidebar.tsx
-import React from 'react';
-import { NavLink } from 'react-router-dom';
-import { useAuth } from './AuthProvider';
+import React from "react";
+import { NavLink } from "react-router-dom";
+import { HomeIcon, BookOpenIcon, ChartBarIcon, CogIcon } from "@heroicons/react/24/outline";
 
-export default function Sidebar() {
-  const { user, showAuthModal } = useAuth();
-
-  const navItems = [
-    { name: 'Trang chủ', path: '/' },
-    { name: 'Chế độ học', path: '/learn' },
-    { name: 'Quản lý từ vựng', path: '/vocabulary' },
-    { name: 'Thống kê', path: '/statistics' },
-    { name: 'Cài đặt', path: '/settings' },
+export const Sidebar: React.FC = () => {
+  const links = [
+    { to: "/", label: "Trang chủ", icon: <HomeIcon className="w-5 h-5" /> },
+    { to: "/learn", label: "Chế độ học", icon: <BookOpenIcon className="w-5 h-5" /> },
+    { to: "/statistics", label: "Thống kê", icon: <ChartBarIcon className="w-5 h-5" /> },
+    { to: "/settings", label: "Cài đặt", icon: <CogIcon className="w-5 h-5" /> },
   ];
 
   return (
-    <div className="w-64 h-screen bg-gray-100 dark:bg-gray-800 p-4 flex flex-col justify-between">
-      <div className="space-y-2">
-        <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-gray-100">Nihongo App</h2>
-        {navItems.map(item => (
+    <aside className="w-64 bg-white dark:bg-gray-800 shadow-md flex flex-col">
+      <div className="p-6 text-xl font-bold text-gray-800 dark:text-gray-100">
+        Học Từ vựng
+      </div>
+      <nav className="flex-1 flex flex-col">
+        {links.map((link) => (
           <NavLink
-            key={item.path}
-            to={item.path}
+            key={link.to}
+            to={link.to}
             className={({ isActive }) =>
-              `block px-4 py-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 ${
-                isActive ? 'bg-gray-300 dark:bg-gray-700 font-semibold' : 'text-gray-800 dark:text-gray-200'
+              `flex items-center gap-3 px-6 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                isActive ? "bg-gray-200 dark:bg-gray-700 font-semibold" : ""
               }`
             }
           >
-            {item.name}
+            {link.icon}
+            <span>{link.label}</span>
           </NavLink>
         ))}
-      </div>
-
-      {!user && (
-        <button
-          className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          onClick={() => showAuthModal(true)}
-        >
-          Đăng nhập
-        </button>
-      )}
-    </div>
+      </nav>
+    </aside>
   );
-}
+};
