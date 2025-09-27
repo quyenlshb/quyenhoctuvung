@@ -2,7 +2,6 @@
  * Vocabulary Manager Component
  * Handles adding, editing, and deleting vocabulary words and sets
  * Integrated with Firebase Firestore
- * UPDATED: Bulk Import logic modified to only accept 3 fields (Kanji, Kana, Meaning)
  */
 
 import { useState, useEffect, useCallback } from 'react'
@@ -12,9 +11,16 @@ import { Input } from './ui/input'
 import { Label } from './ui/label'
 import { Textarea } from './ui/textarea'
 import { Badge } from './ui/badge'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog'
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger, 
+  DialogDescription // ✅ SỬA: Đã thêm DialogDescription để khắc phục ReferenceError
+} from './ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
-import { useToast } from '../hooks/use-toast' // Giả định useToast từ shadcn
+import { useToast } from '../hooks/use-toast' 
 import { 
   Plus, 
   Edit2, 
@@ -43,8 +49,7 @@ import {
 import type { VocabularySet, VocabularyWord } from '../lib/firebase' // Import interfaces
 
 // ----------------------------------------------------
-// INTERFACES (Được giữ nguyên nếu đã tồn tại, nếu chưa có thì phải thêm)
-// Tạm thời sử dụng interface đã import từ firebase.ts
+// INTERFACES (Được giữ nguyên)
 
 export default function VocabularyManager() {
   const { user } = useAuth()
@@ -146,7 +151,7 @@ export default function VocabularyManager() {
   // II. LOGIC QUẢN LÝ BỘ TỪ (VOCABULARY SETS)
   // ----------------------------------------------------
 
-  // ✅ SỬA: Cập nhật hàm này
+  // ✅ SỬA: Cập nhật hàm này để giải quyết lỗi tạo bộ từ không hiển thị
   const handleCreateSet = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newSetName.trim() || !user) return
@@ -280,6 +285,14 @@ export default function VocabularyManager() {
       // Cập nhật state cục bộ
       setVocabularyWords(prevWords => [wordWithId, ...prevWords])
       
+      // Cập nhật số lượng từ trong bộ từ đang chọn (Nếu totalWords chưa được update tự động)
+      if (selectedSet) {
+        setSelectedSet(prevSet => prevSet ? { ...prevSet, totalWords: (prevSet.totalWords || 0) + 1 } : null)
+        setVocabularySets(prevSets => prevSets.map(set => 
+          set.id === selectedSet.id ? { ...set, totalWords: (set.totalWords || 0) + 1 } : set
+        ))
+      }
+
       // Reset form
       setNewWordKanji('')
       setNewWordKana('')
@@ -355,6 +368,14 @@ export default function VocabularyManager() {
       // Cập nhật state cục bộ
       setVocabularyWords(prevWords => prevWords.filter(word => word.id !== wordId))
       
+      // Cập nhật số lượng từ trong bộ từ đang chọn (Nếu totalWords chưa được update tự động)
+      if (selectedSet && selectedSet.id === setId) {
+        setSelectedSet(prevSet => prevSet ? { ...prevSet, totalWords: Math.max(0, (prevSet.totalWords || 0) - 1) } : null)
+        setVocabularySets(prevSets => prevSets.map(set => 
+            set.id === setId ? { ...set, totalWords: Math.max(0, (set.totalWords || 0) - 1) } : set
+        ))
+      }
+
       toast({
         title: 'Thành công!',
         description: 'Đã xóa từ vựng.',
@@ -370,7 +391,7 @@ export default function VocabularyManager() {
     } finally {
       setIsLoading(false)
     }
-  }, [user, toast])
+  }, [user, selectedSet, toast])
 
   // ----------------------------------------------------
   // IV. LOGIC BULK IMPORT (Giữ nguyên)
@@ -413,6 +434,14 @@ export default function VocabularyManager() {
         
         // Cập nhật state cục bộ
         setVocabularyWords(prevWords => [...addedWords, ...prevWords])
+        
+        // Cập nhật số lượng từ trong bộ từ đang chọn
+        if (selectedSet) {
+            setSelectedSet(prevSet => prevSet ? { ...prevSet, totalWords: (prevSet.totalWords || 0) + addedWords.length } : null)
+            setVocabularySets(prevSets => prevSets.map(set => 
+                set.id === selectedSet.id ? { ...set, totalWords: (set.totalWords || 0) + addedWords.length } : set
+            ))
+        }
 
         toast({
             title: 'Thành công!',
@@ -485,6 +514,9 @@ export default function VocabularyManager() {
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Tạo Bộ Từ Vựng Mới</DialogTitle>
+            <DialogDescription>
+                Đặt tên và mô tả cho bộ từ mới của bạn.
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreateSet} className="grid gap-4 py-4">
             <div className="grid gap-2">
@@ -588,6 +620,9 @@ export default function VocabularyManager() {
                     <DialogContent className="sm:max-w-[425px]">
                       <DialogHeader>
                         <DialogTitle>Chỉnh sửa Bộ Từ Vựng</DialogTitle>
+                        <DialogDescription>
+                            Thay đổi tên và mô tả của bộ từ này.
+                        </DialogDescription>
                       </DialogHeader>
                       <EditSetForm 
                         set={selectedSet} 
