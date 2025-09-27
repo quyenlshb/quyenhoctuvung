@@ -18,12 +18,12 @@ export default function App() {
     // XÓA thẻ <BrowserRouter> ở đây
     <Routes>
       <Route path="/" element={<Shell />}>
-        <Route index element={<HomePage />} />
-        <Route path="settings" element={<SettingsPage />} />
-        <Route path="statistics" element={<StatisticsPage />} />
-        <Route path="learn" element={<LearningMode />} />
-        <Route path="vocabulary" element={<VocabularyManager />} />
-      </Route>
+  <Route index element={<HomePage />} />
+  <Route path="learn/:setId" element={<LearningMode />} />
+  <Route path="settings" element={<SettingsPage />} />
+  <Route path="statistics" element={<StatisticsPage />} />
+  <Route path="vocabulary" element={<VocabularyManager />} />
+</Route>
     </Routes>
     // XÓA thẻ </BrowserRouter> ở đây
   )
