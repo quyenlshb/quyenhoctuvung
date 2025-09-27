@@ -34,15 +34,15 @@ import {
   increment 
 } from "firebase/firestore";
 
-// 2. CẤU HÌNH FIREBASE CỦA BẠN (Sử dụng cấu hình từ snippet)
+// 2. CẤU HÌNH FIREBASE MỚI CỦA BẠN (Dự án: qwer-c9de3)
 const firebaseConfig = {
-  apiKey: "AIzaSyBk_wQreKzw0zKQtl7IBYge-W9RPoF1z7U",
-  authDomain: "fghy-44958.firebaseapp.com",
-  projectId: "fghy-44958",
-  storageBucket: "fghy-44958.appspot.com",
-  messagingSenderId: "360098045610",
-  appId: "1:360098045610:web:10e5882e5b7e3f895c1f6b",
-  measurementId: "G-J98FJH88S"
+  apiKey: "AIzaSyDJRsHMjU2G2BAtR3ZC9TlYjP0QMu1xSaw",
+  authDomain: "qwer-c9de3.firebaseapp.com",
+  projectId: "qwer-c9de3",
+  storageBucket: "qwer-c9de3.firebasestorage.app",
+  messagingSenderId: "144621785008",
+  appId: "1:144621785008:web:97ce2b548fd1c26c629075",
+  measurementId: "G-CJ1KJL5WWY"
 };
 
 // 3. KHỞI TẠO VÀ EXPORT
@@ -164,7 +164,7 @@ export const getVocabularySets = async (userId: string): Promise<VocabularySet[]
     return setsSnap.docs.map(doc => ({
       id: doc.id,
       ...doc.data(),
-    }) as VocabularySet);
+    })) as VocabularySet[];
   } catch (error) {
     console.error('Error getting vocabulary sets:', error);
     throw new Error('Tải bộ từ thất bại');
@@ -191,31 +191,33 @@ export const addVocabularySet = async (
       totalWords: 0, // ⚡️ SỬA 2: THÊM TRƯỜNG TOTALWORDS VÀO PAYLOAD GHI DB
     };
 
-    // Ghi dữ liệu vào Firestore
-    const newSetRef = await addDoc(collection(db, 'users', userId, 'vocabularySets'), newSet);
+    // Đường dẫn subcollection: users/{userId}/vocabularySets
+    const setDocRef = await addDoc(collection(db, 'users', userId, 'vocabularySets'), newSet);
 
-    // Trả về đối tượng hoàn chỉnh bao gồm ID
-    return { 
-      id: newSetRef.id, 
-      ...newSet, 
-    } as VocabularySet; 
+    // Trả về đối tượng VocabularySet hoàn chỉnh (có ID)
+    return {
+      id: setDocRef.id,
+      ...newSet
+    } as VocabularySet;
+
   } catch (error) {
     console.error('Error adding vocabulary set:', error);
-    throw new Error('Tạo bộ từ thất bại');
+    throw new Error('Thêm bộ từ thất bại');
   }
 };
 
 /**
- * Cập nhật thông tin bộ từ (Đường dẫn Subcollection đã đúng)
+ * Cập nhật tên và mô tả của bộ từ vựng
  */
 export const updateVocabularySet = async (
   userId: string, 
   setId: string, 
-  data: Partial<Omit<VocabularySet, 'id' | 'userId' | 'createdAt'>>
+  name: string, 
+  description: string
 ) => {
   try {
     const setDocRef = doc(db, 'users', userId, 'vocabularySets', setId);
-    await updateDoc(setDocRef, data);
+    await updateDoc(setDocRef, { name, description });
   } catch (error) {
     console.error('Error updating vocabulary set:', error);
     throw new Error('Cập nhật bộ từ thất bại');
@@ -223,36 +225,53 @@ export const updateVocabularySet = async (
 };
 
 /**
- * Xóa bộ từ vựng (Đường dẫn Subcollection đã đúng)
+ * Xóa một bộ từ vựng. Cần xóa TẤT CẢ các từ con trong subcollection 'words'
  */
 export const deleteVocabularySet = async (userId: string, setId: string) => {
   try {
+    const batch = writeBatch(db);
     const setDocRef = doc(db, 'users', userId, 'vocabularySets', setId);
-    // Lưu ý: Việc xóa các sub-collection ('words') nên được xử lý bằng Cloud Functions
-    // hoặc đảm bảo Firestore Rules không ngăn cản việc xóa set này.
-    await deleteDoc(setDocRef);
+    
+    // 1. Xóa TẤT CẢ các từ con trong subcollection 'words' (rất quan trọng!)
+    const wordsRef = collection(setDocRef, 'words');
+    const wordsSnap = await getDocs(wordsRef);
+    wordsSnap.docs.forEach(wordDoc => {
+      batch.delete(wordDoc.ref);
+    });
+
+    // 2. Xóa tài liệu VocabularySet chính
+    batch.delete(setDocRef);
+
+    // 3. Commit batch
+    await batch.commit();
+
   } catch (error) {
     console.error('Error deleting vocabulary set:', error);
     throw new Error('Xóa bộ từ thất bại');
   }
 };
 
+
 // ----------------------------------------------------
-// FIRESTORE VOCABULARY WORDS (Đường dẫn Subcollection đã đúng)
+// FIRESTORE VOCABULARY WORDS
 // ----------------------------------------------------
 
 /**
- * Tải danh sách từ vựng trong một bộ từ
+ * Tải các từ vựng thuộc một bộ từ (Subcollection: words)
  */
 export const getVocabularyWords = async (userId: string, setId: string): Promise<VocabularyWord[]> => {
   try {
+    // Đường dẫn Subcollection: users/{userId}/vocabularySets/{setId}/words
     const wordsRef = collection(db, 'users', userId, 'vocabularySets', setId, 'words');
-    const wordsSnap = await getDocs(wordsRef);
+    // Sắp xếp theo difficulty (ví dụ)
+    const q = query(wordsRef, orderBy('difficulty', 'asc')); 
+    const wordsSnap = await getDocs(q);
 
     return wordsSnap.docs.map(doc => ({
       id: doc.id,
       ...doc.data(),
-    }) as VocabularyWord);
+    })) as VocabularyWord[];
+
   } catch (error) {
     console.error('Error getting vocabulary words:', error);
     throw new Error('Tải từ vựng thất bại');
@@ -260,99 +279,53 @@ export const getVocabularyWords = async (userId: string, setId: string): Promise
 };
 
 /**
- * Thêm một từ vựng mới
+ * Thêm từ vựng mới vào bộ từ (Subcollection: words)
  */
 export const addVocabularyWord = async (
   userId: string, 
   setId: string, 
-  wordData: Omit<VocabularyWord, 'id' | 'difficulty' | 'lastReviewed'>
+  word: Omit<VocabularyWord, 'id' | 'lastReviewed'>
 ): Promise<VocabularyWord> => {
   try {
-    const newWord = {
-      ...wordData,
-      difficulty: 0, // Mặc định là khó nhất khi mới tạo
-      lastReviewed: Timestamp.now(),
+    const wordsRef = collection(db, 'users', userId, 'vocabularySets', setId, 'words');
+    const newWordPayload = {
+      ...word,
+      difficulty: 50, // Khởi tạo độ khó trung bình (0-100)
+      lastReviewed: null,
+      createdAt: Timestamp.now(),
     };
     
-    const wordsRef = collection(db, 'users', userId, 'vocabularySets', setId, 'words');
-    const newWordRef = await addDoc(wordsRef, newWord);
+    const wordDocRef = await addDoc(wordsRef, newWordPayload);
 
-    // Cập nhật totalWords cho bộ từ
+    // Tăng trường totalWords trong tài liệu VocabularySet chính
     const setDocRef = doc(db, 'users', userId, 'vocabularySets', setId);
     await updateDoc(setDocRef, {
         totalWords: increment(1)
     });
 
-    return { 
-      id: newWordRef.id, 
-      ...newWord 
+    return {
+      id: wordDocRef.id,
+      ...newWordPayload
     } as VocabularyWord;
-    
+
   } catch (error) {
     console.error('Error adding vocabulary word:', error);
     throw new Error('Thêm từ vựng thất bại');
   }
 };
 
-// Hàm Bulk Import được sử dụng trong VocabularyManager.tsx
-addVocabularyWord.bulk = async (
-  userId: string,
-  setId: string,
-  wordDataArray: Omit<VocabularyWord, 'id' | 'difficulty' | 'lastReviewed'>[]
-): Promise<VocabularyWord[]> => {
-  if (wordDataArray.length === 0) return [];
-  
-  const batch = writeBatch(db);
-  const wordsRef = collection(db, 'users', userId, 'vocabularySets', setId, 'words');
-  const addedWords: VocabularyWord[] = [];
-  const now = Timestamp.now();
-
-  wordDataArray.forEach(wordData => {
-    const newWordRef = doc(wordsRef); // Tạo reference với ID mới
-    const newWord = {
-      ...wordData,
-      difficulty: 0,  
-      lastReviewed: now,
-    };
-    
-    batch.set(newWordRef, newWord);
-    
-    addedWords.push({ 
-      id: newWordRef.id, 
-      ...newWord 
-    } as VocabularyWord);
-  });
-
-  try {
-    await batch.commit();
-
-    // Cập nhật totalWords cho bộ từ
-    const setDocRef = doc(db, 'users', userId, 'vocabularySets', setId);
-    await updateDoc(setDocRef, {
-        totalWords: increment(wordDataArray.length)
-    });
-
-    return addedWords;
-
-  } catch (error) {
-    console.error('Error during bulk import:', error);
-    throw new Error('Nhập từ vựng số lượng lớn thất bại');
-  }
-};
-
-
 /**
- * Cập nhật thông tin từ vựng
+ * Cập nhật một từ vựng
  */
 export const updateVocabularyWord = async (
   userId: string, 
   setId: string, 
   wordId: string, 
-  data: Partial<Omit<VocabularyWord, 'id' | 'lastReviewed'>>
+  updates: Partial<VocabularyWord>
 ) => {
   try {
     const wordDocRef = doc(db, 'users', userId, 'vocabularySets', setId, 'words', wordId);
-    await updateDoc(wordDocRef, data);
+    await updateDoc(wordDocRef, updates);
   } catch (error) {
     console.error('Error updating vocabulary word:', error);
     throw new Error('Cập nhật từ vựng thất bại');
@@ -364,15 +337,15 @@ export const updateVocabularyWord = async (
  */
 export const deleteVocabularyWord = async (userId: string, setId: string, wordId: string) => {
   try {
+    // 1. Xóa tài liệu từ vựng
     const wordDocRef = doc(db, 'users', userId, 'vocabularySets', setId, 'words', wordId);
     await deleteDoc(wordDocRef);
-    
-    // Cập nhật totalWords cho bộ từ
+
+    // 2. Giảm trường totalWords trong tài liệu VocabularySet chính
     const setDocRef = doc(db, 'users', userId, 'vocabularySets', setId);
     await updateDoc(setDocRef, {
         totalWords: increment(-1)
     });
-
   } catch (error) {
     console.error('Error deleting vocabulary word:', error);
     throw new Error('Xóa từ vựng thất bại');
@@ -384,54 +357,23 @@ export const deleteVocabularyWord = async (userId: string, setId: string, wordId
 // ----------------------------------------------------
 
 /**
- * Lưu phiên học và cập nhật độ khó từ vựng
- * @param sessionData - Dữ liệu phiên học
+ * Lưu kết quả một phiên học
  */
-export const saveLearningSession = async (
-  userId: string, 
-  setId: string, 
-  sessionData: Omit<LearningSessionHistory, 'id'>
-) => {
-  const batch = writeBatch(db);
-  const now = Timestamp.now();
-  
+export const saveLearningSession = async (userId: string, sessionData: Omit<LearningSessionHistory, 'id'>) => {
   try {
-    // 1. Lưu session history
     const sessionsRef = collection(db, 'users', userId, 'learningSessions');
-    const sessionDocRef = doc(sessionsRef);
-    batch.set(sessionDocRef, {
-        ...sessionData,
-        date: now
+    await addDoc(sessionsRef, {
+      ...sessionData,
+      date: Timestamp.now()
     });
-
-    // 2. Cập nhật độ khó của từng từ vựng
-    sessionData.wordUpdates.forEach(update => {
-        const wordDocRef = doc(db, 'users', userId, 'vocabularySets', setId, 'words', update.wordId);
-        batch.update(wordDocRef, {
-            difficulty: update.newDifficulty,
-            lastReviewed: now
-        });
-    });
-
-    // 3. Cập nhật thống kê tổng quát của người dùng (tăng điểm, tăng streak,...)
-    // Giả định logic tính toán điểm và streak nằm ở component gọi hàm này
-    const pointsGained = sessionData.correctAnswers;
-    const userDocRef = doc(db, 'users', userId);
-    batch.update(userDocRef, {
-        totalPoints: increment(pointsGained),
-        // Logic streak phức tạp hơn, có thể cần Cloud Function hoặc hàm riêng biệt
-        lastUpdated: now
-    });
-    
-    await batch.commit();
   } catch (error) {
-    console.error('Error saving learning session:', error);
+    console.error('Save learning session error:', error);
     throw new Error('Lưu phiên học thất bại');
   }
 };
 
 /**
- * Tải lịch sử các phiên học (cần cho component Statistics.tsx).
+ * Tải lịch sử các phiên học (dùng cho component Statistics.tsx).
  */
 export const getLearningSessions = async (userId: string): Promise<LearningSessionHistory[]> => {
   try {
