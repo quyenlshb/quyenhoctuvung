@@ -4,13 +4,12 @@ import path from 'path'
 
 export default defineConfig({
   
-  // ✅ FIX QUAN TRỌNG: Sử dụng đường dẫn tương đối cho Vercel
+  // FIX: Đường dẫn tương đối cho Vercel
   base: './', 
   
   plugins: [react()],
   
   resolve: {
-    // Đảm bảo alias @/* hoạt động
     alias: {
       '@': path.resolve(__dirname, './src'),
     },

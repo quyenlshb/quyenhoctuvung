@@ -4,12 +4,11 @@ import { BrowserRouter } from 'react-router-dom'
 import './shadcn.css'
 import App from './App'
 import { AuthProvider } from './components/AuthProvider' 
-// ✅ FIX BỔ SUNG: Import Toaster để tránh lỗi runtime khi dùng useToast
+// BỔ SUNG: Import Toaster để tránh lỗi runtime khi dùng useToast
 import { Toaster } from './components/ui/toaster' 
 
 const root = createRoot(document.getElementById('app')!)
 
-// Đảm bảo Toaster được render bên dưới App
 root.render(
   <BrowserRouter>
     <AuthProvider>

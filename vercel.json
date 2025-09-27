@@ -10,12 +10,10 @@
     }
   ],
   "routes": [
-    // ✅ FIX QUAN TRỌNG: Định tuyến rõ ràng các tài sản tĩnh (JS, CSS, Maps)
     {
       "src": "/assets/(.*)",
       "dest": "/dist/assets/$1"
     },
-    // Trỏ tất cả các đường dẫn khác về index.html (cho React Router)
     {
       "src": "/(.*)",
       "dest": "/dist/index.html"
