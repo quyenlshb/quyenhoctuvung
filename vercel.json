@@ -10,14 +10,10 @@
     }
   ],
   "routes": [
-    // ✅ 1. BẢO VỆ CÁC TỆP TĨNH (JS, CSS, Ảnh, Fonts)
-    // Phục vụ các tệp có đuôi mở rộng (bao gồm cả tệp JS đã build từ main.tsx)
     {
       "src": "/(.*\\.(?:js|css|ico|svg|png|jpg|jpeg|gif|json|webmanifest|woff2|woff|ttf))$",
       "dest": "/$1" 
     },
-    // ✅ 2. CHUYỂN HƯỚNG CÁC ĐƯỜNG DẪN ỨNG DỤNG (History API fallback)
-    // Mọi đường dẫn khác (ví dụ: /learn, /settings) sẽ trỏ về index.html để React Router xử lý.
     {
       "src": "/(.*)",
       "dest": "/index.html"
