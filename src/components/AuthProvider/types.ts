@@ -1,3 +1,6 @@
+// File: src/components/AuthProvider/types.ts
+
+// ---------------- USER INTERFACE ----------------
 export interface User {
   id: string
   email: string
@@ -8,6 +11,7 @@ export interface User {
   totalWords: number
 }
 
+// ---------------- AUTH CONTEXT INTERFACE ----------------
 export interface AuthContextType {
   user: User | null
   loading: boolean
