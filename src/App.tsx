@@ -1,26 +1,24 @@
-// File: src/App.tsx
 import { Routes, Route } from 'react-router-dom'
-
-// Pages
 import HomePage from './pages/Home'
 import SettingsPage from './pages/Settings'
 import StatisticsPage from './pages/Statistics'
 import LearningMode from './components/LearningMode'
 import VocabularyManager from './components/VocabularyManager'
-
-// Layout
 import Shell from './components/Shell'
 
-// Auth
-import { AuthProvider, useAuthProvider } from './components/AuthProvider'
+import { AuthProvider, useAuthProvider, AuthModal } from './components/AuthProvider'
 import { Toaster } from './components/ui/toaster'
 
 export default function App() {
-  // ✅ Hook AuthProvider chỉ gọi trong component
   const authContext = useAuthProvider()
 
   return (
     <AuthProvider value={authContext}>
+      <AuthModal 
+        showAuthForm={authContext.showAuthForm} 
+        setShowAuthForm={authContext.showAuthModal} 
+      />
+
       <Routes>
         <Route path="/" element={<Shell />}>
           <Route index element={<HomePage />} />
@@ -30,7 +28,8 @@ export default function App() {
           <Route path="vocabulary" element={<VocabularyManager />} />
         </Route>
       </Routes>
-      <Toaster /> {/* Phải có Toaster nếu dùng useToast */}
+
+      <Toaster />
     </AuthProvider>
   )
 }
