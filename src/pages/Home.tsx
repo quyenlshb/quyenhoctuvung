@@ -7,7 +7,7 @@ import { useAuth } from '../components/AuthProvider'
 import { getVocabularySets } from '../lib/firebase'
 
 export default function HomePage() {
-  const { user } = useAuth()
+  const { user, showAuthModal } = useAuth()  // Lấy showAuthModal
   const navigate = useNavigate()
   const [sets, setSets] = useState<any[]>([])
 
@@ -35,9 +35,15 @@ export default function HomePage() {
               Hãy bắt đầu buổi học từ vựng ngay bây giờ.
             </p>
           ) : (
-            <p className="text-lg text-gray-600 dark:text-gray-400">
-              Vui lòng đăng nhập hoặc đăng ký để bắt đầu hành trình học từ vựng của bạn.
-            </p>
+            <>
+              <p className="text-lg text-gray-600 dark:text-gray-400">
+                Vui lòng đăng nhập hoặc đăng ký để bắt đầu hành trình học từ vựng của bạn.
+              </p>
+              {/* Nút đăng nhập */}
+              <Button className="mt-4" onClick={() => showAuthModal(true)}>
+                Đăng nhập
+              </Button>
+            </>
           )}
         </CardContent>
       </Card>

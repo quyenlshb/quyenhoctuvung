@@ -1,38 +1,39 @@
-import { Route, Routes } from 'react-router-dom'
-
-// Trang
-import HomePage from './pages/Home'
-import SettingsPage from './pages/Settings'
-import StatisticsPage from './pages/Statistics'
-import LearningMode from './components/LearningMode'
-import VocabularyManager from './components/VocabularyManager'
-
-// Shell
+// File: src/App.tsx
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import Shell from './components/Shell'
-
-// Auth
 import { AuthProvider, useAuthProvider } from './components/AuthProvider'
-
-// Toaster
+import AuthModal from './components/AuthProvider/AuthModal'
 import { Toaster } from './components/ui/toaster'
+import HomePage from './pages/Home'
+import LearnPage from './pages/Learn'
+import VocabularyPage from './pages/Vocabulary'
+import StatisticsPage from './pages/Statistics'
+import SettingsPage from './pages/Settings'
 
 export default function App() {
+  // Lấy context auth
   const authContext = useAuthProvider()
 
   return (
     <AuthProvider value={authContext}>
-      {/* Routes */}
-      <Routes>
-        <Route path="/" element={<Shell />}>
-          <Route index element={<HomePage />} />
-          <Route path="learn/:setId" element={<LearningMode />} />
-          <Route path="settings" element={<SettingsPage />} />
-          <Route path="statistics" element={<StatisticsPage />} />
-          <Route path="vocabulary" element={<VocabularyManager />} />
-        </Route>
-      </Routes>
+      <Router>
+        {/* Modal auth */}
+        <AuthModal />
 
-      <Toaster />
+        {/* Toaster chung */}
+        <Toaster />
+
+        {/* Routes */}
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/app/*" element={<Shell />}>
+            <Route path="learn" element={<LearnPage />} />
+            <Route path="vocabulary" element={<VocabularyPage />} />
+            <Route path="statistics" element={<StatisticsPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+          </Route>
+        </Routes>
+      </Router>
     </AuthProvider>
   )
 }
