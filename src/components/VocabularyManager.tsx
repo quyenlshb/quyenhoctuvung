@@ -37,557 +37,690 @@ import {
   deleteVocabularySet, 
   getVocabularyWords,
   addVocabularyWord, 
-  updateVocabularyWord, 
-  deleteVocabularyWord,
-  addMultipleVocabularyWords 
+  updateVocabularyWord,
+  deleteVocabularyWord
 } from '../lib/firebase' 
+import type { VocabularySet, VocabularyWord } from '../lib/firebase' // Import interfaces
 
 // ----------------------------------------------------
-// INTERFACES
-// ----------------------------------------------------
-
-interface VocabularySet {
-  id: string
-  name: string
-  wordCount: number
-  userId: string
-}
-
-interface VocabularyWord {
-  id: string
-  kanji: string
-  kana: string
-  meaning: string
-  notes?: string
-  difficulty: number // Score from 0-100
-}
-
-interface NewWordState {
-  kanji: string
-  kana: string
-  meaning: string
-  notes: string
-}
-
-// ----------------------------------------------------
-// CONSTANTS
-// ----------------------------------------------------
-const INITIAL_NEW_WORD_STATE: NewWordState = {
-  kanji: '',
-  kana: '',
-  meaning: '',
-  notes: '',
-}
-
-// ----------------------------------------------------
-// MAIN COMPONENT
-// ----------------------------------------------------
+// INTERFACES (Được giữ nguyên nếu đã tồn tại, nếu chưa có thì phải thêm)
+// Tạm thời sử dụng interface đã import từ firebase.ts
 
 export default function VocabularyManager() {
+  const { user } = useAuth()
   const { toast } = useToast()
-  
-  // ✅ LẤY THÔNG TIN USER TỪ AUTH CONTEXT
-  const { user } = useAuth(); 
-  const userId = user?.id; // Lấy ID người dùng
 
-  const [sets, setSets] = useState<VocabularySet[]>([])
+  const [vocabularySets, setVocabularySets] = useState<VocabularySet[]>([])
   const [selectedSet, setSelectedSet] = useState<VocabularySet | null>(null)
-  const [words, setWords] = useState<VocabularyWord[]>([])
-  const [newSetName, setNewSetName] = useState('')
-  const [newWord, setNewWord] = useState<NewWordState>(INITIAL_NEW_WORD_STATE)
+  const [vocabularyWords, setVocabularyWords] = useState<VocabularyWord[]>([])
+
   const [isLoading, setIsLoading] = useState(false)
-  const [isAddSetDialogOpen, setIsAddSetDialogOpen] = useState(false)
-  const [isAddWordDialogOpen, setIsAddWordDialogOpen] = useState(false)
+  const [isCreateSetOpen, setIsCreateSetOpen] = useState(false)
+  
+  // State cho form tạo bộ từ
+  const [newSetName, setNewSetName] = useState('')
+  const [newSetDescription, setNewSetDescription] = useState('')
+
+  // State cho form thêm từ
+  const [newWordKanji, setNewWordKanji] = useState('')
+  const [newWordKana, setNewWordKana] = useState('')
+  const [newWordMeaning, setNewWordMeaning] = useState('')
+  const [newWordNotes, setNewWordNotes] = useState('')
+  
+  // State cho form chỉnh sửa từ (dùng chung)
+  const [isEditWordOpen, setIsEditWordOpen] = useState(false)
+  const [editingWord, setEditingWord] = useState<VocabularyWord | null>(null)
+  const [editKanji, setEditKanji] = useState('')
+  const [editKana, setEditKana] = useState('')
+  const [editMeaning, setEditMeaning] = useState('')
+  const [editNotes, setEditNotes] = useState('')
+
+  // State cho Bulk Import
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false)
-  const [bulkImportText, setBulkImportText] = useState('')
+  const [bulkData, setBulkData] = useState('')
+  const [bulkImportProgress, setBulkImportProgress] = useState<string | null>(null)
 
 
-  // --- LOGIC FETCH DỮ LIỆU ---
+  // ----------------------------------------------------
+  // I. LOGIC TẢI DỮ LIỆU
+  // ----------------------------------------------------
 
+  // 1. Tải danh sách bộ từ
   const fetchSets = useCallback(async () => {
-    if (!userId) {
-      setSets([]);
-      // Không cần toast nếu người dùng chưa đăng nhập, vì Shell.tsx đã xử lý
-      return; 
-    }
-    
+    if (!user) return
     setIsLoading(true)
     try {
-      const fetchedSets = await getVocabularySets(userId)
-      setSets(fetchedSets)
-      // Tự động chọn bộ từ đầu tiên nếu có và chưa có bộ nào được chọn
-      if (fetchedSets.length > 0 && !selectedSet) {
-        setSelectedSet(fetchedSets[0])
+      const sets = await getVocabularySets(user.id)
+      setVocabularySets(sets)
+      // Nếu không có bộ từ nào được chọn trước, chọn bộ từ đầu tiên (nếu có)
+      if (!selectedSet && sets.length > 0) {
+        setSelectedSet(sets[0])
       }
     } catch (error) {
-      console.error(error)
+      console.error('Error fetching vocabulary sets:', error)
       toast({
-        title: "Lỗi",
-        description: "Không thể tải danh sách bộ từ.",
-        variant: "destructive",
+        title: 'Lỗi',
+        description: 'Không thể tải danh sách bộ từ.',
+        variant: 'destructive',
       })
     } finally {
       setIsLoading(false)
     }
-  }, [userId, selectedSet, toast])
+  }, [user, selectedSet, toast])
 
+  // 2. Tải các từ trong bộ từ đã chọn
   const fetchWords = useCallback(async (setId: string) => {
-    if (!userId) return;
     setIsLoading(true)
     try {
-      const fetchedWords = await getVocabularyWords(setId, userId)
-      setWords(fetchedWords)
+      const words = await getVocabularyWords(user!.id, setId)
+      setVocabularyWords(words)
     } catch (error) {
-      console.error(error)
+      console.error('Error fetching vocabulary words:', error)
       toast({
-        title: "Lỗi",
-        description: "Không thể tải từ vựng.",
-        variant: "destructive",
+        title: 'Lỗi',
+        description: 'Không thể tải từ vựng.',
+        variant: 'destructive',
       })
+      setVocabularyWords([]) // Xóa danh sách nếu lỗi
     } finally {
       setIsLoading(false)
     }
-  }, [userId, toast])
+  }, [user, toast])
 
+  // useEffect để tải danh sách bộ từ ban đầu
   useEffect(() => {
     fetchSets()
-  }, [fetchSets])
+  }, [fetchSets]) 
 
+  // useEffect để tải từ vựng khi bộ từ được chọn thay đổi
   useEffect(() => {
     if (selectedSet) {
       fetchWords(selectedSet.id)
     } else {
-      setWords([])
+      setVocabularyWords([])
     }
   }, [selectedSet, fetchWords])
 
 
-  // --- LOGIC QUẢN LÝ BỘ TỪ ---
+  // ----------------------------------------------------
+  // II. LOGIC QUẢN LÝ BỘ TỪ (VOCABULARY SETS)
+  // ----------------------------------------------------
 
-  // ✅ HÀM ĐÃ SỬA: handleAddSet
-  const handleAddSet = async () => {
-    if (!newSetName.trim()) {
-      toast({
-        title: "Thao tác thất bại",
-        description: "Tên bộ từ không được để trống.",
-        variant: "destructive",
-      });
-      return; 
-    }
-
-    // ✅ BƯỚC QUAN TRỌNG: KIỂM TRA userId
-    if (!userId) {
-      toast({
-        title: "Lỗi Xác thực",
-        description: "Vui lòng đăng nhập để tạo bộ từ vựng mới.",
-        variant: "destructive",
-      });
-      return; 
-    }
-
-    setIsLoading(true);
-    try {
-      // ✅ TRUYỀN userId VÀO HÀM FIREBASE ĐÃ CẬP NHẬT
-      await addVocabularySet(userId, newSetName.trim()); 
-      
-      setNewSetName('');
-      setIsAddSetDialogOpen(false);
-      
-      // Tải lại danh sách bộ từ sau khi thêm thành công
-      fetchSets(); 
-      
-      toast({
-        title: "Thành công",
-        description: `Đã tạo bộ từ '${newSetName}'`,
-      });
-    } catch (error) {
-      console.error('Lỗi khi thêm bộ từ:', error);
-      toast({
-        title: "Thao tác thất bại",
-        description: "Có lỗi xảy ra, có thể do lỗi quyền truy cập. Vui lòng thử lại.", 
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleDeleteSet = async (setId: string, setName: string) => {
-    if (!userId || !confirm(`Bạn có chắc chắn muốn xóa bộ từ '${setName}' và TẤT CẢ từ vựng bên trong?`)) return
+  // ✅ SỬA: Cập nhật hàm này
+  const handleCreateSet = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newSetName.trim() || !user) return
 
     setIsLoading(true)
     try {
-      await deleteVocabularySet(setId, userId)
-      setSelectedSet(null) // Bỏ chọn bộ từ đã xóa
-      fetchSets() // Tải lại danh sách
+      // 1. GỌI HÀM TẠO TỪ FIREBASE VÀ LẤY VỀ ĐỐI TƯỢNG BỘ TỪ MỚI
+      const newSet = await addVocabularySet(
+        user.id,
+        newSetName.trim(),
+        newSetDescription.trim()
+      )
+
+      // ⚡️ BƯỚC SỬA 1: CẬP NHẬT STATE VỚI BỘ TỪ MỚI
+      setVocabularySets((prevSets) => [...prevSets, newSet])
+      
+      // ⚡️ BƯỚC SỬA 2: CHỌN BỘ TỪ MỚI NGAY LẬP TỨC
+      setSelectedSet(newSet) 
+      
+      // Reset form và đóng dialog
+      setNewSetName('')
+      setNewSetDescription('')
+      setIsCreateSetOpen(false) 
+      
       toast({
-        title: "Thành công",
-        description: `Đã xóa bộ từ '${setName}'.`,
+        title: 'Thành công!',
+        description: `Đã tạo bộ từ "${newSet.name}". Bộ từ đã được chọn.`,
       })
+      
     } catch (error) {
-      console.error(error)
+      console.error('Error creating vocabulary set:', error)
       toast({
-        title: "Lỗi",
-        description: "Xóa bộ từ thất bại.",
-        variant: "destructive",
+        title: 'Lỗi',
+        description: 'Không thể tạo bộ từ. Vui lòng thử lại.',
+        variant: 'destructive',
       })
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [user, newSetName, newSetDescription, toast])
 
-  // --- LOGIC QUẢN LÝ TỪ VỰNG ---
 
-  const handleAddWord = async () => {
-    if (!selectedSet || !userId) return
-    if (!newWord.kanji.trim() || !newWord.meaning.trim()) {
-      toast({
-        title: "Lỗi",
-        description: "Kanji/Kana và Nghĩa không được để trống.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      await addVocabularyWord(selectedSet.id, userId, newWord); 
-      setNewWord(INITIAL_NEW_WORD_STATE);
-      fetchWords(selectedSet.id); // Tải lại danh sách từ
-      fetchSets(); // Tải lại set để cập nhật wordCount
-      setIsAddWordDialogOpen(false);
-      toast({
-        title: "Thành công",
-        description: "Đã thêm từ vựng mới.",
-      });
-    } catch (error) {
-      console.error(error);
-      toast({
-        title: "Lỗi",
-        description: "Thêm từ vựng thất bại.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  const handleDeleteWord = async (setId: string, wordId: string) => {
-    if (!userId || !confirm('Bạn có chắc chắn muốn xóa từ vựng này?')) return
+  const handleDeleteSet = useCallback(async (setId: string, setName: string) => {
+    if (!user || !confirm(`Bạn có chắc chắn muốn xóa bộ từ "${setName}" và tất cả từ vựng của nó?`)) return
 
     setIsLoading(true)
     try {
-      await deleteVocabularyWord(setId, wordId, userId)
-      fetchWords(setId) // Tải lại danh sách từ
-      fetchSets() // Tải lại set để cập nhật wordCount
-      toast({
-        title: "Thành công",
-        description: "Đã xóa từ vựng.",
-      })
-    } catch (error) {
-      console.error(error)
-      toast({
-        title: "Lỗi",
-        description: "Xóa từ vựng thất bại.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleBulkImport = async () => {
-    if (!selectedSet || !userId) return;
-
-    const lines = bulkImportText.trim().split('\n').filter(line => line.trim() !== '');
-    if (lines.length === 0) {
-      toast({
-        title: "Lỗi",
-        description: "Nội dung nhập hàng loạt trống.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const wordsToImport = lines.map(line => {
-      const parts = line.split('\t').map(p => p.trim()); // Giả định dùng tab hoặc khoảng trắng
-      // Cấu trúc dự kiến: Kanji/Kana \t Nghĩa
-      const [kanjiOrKana, meaning] = parts;
-
-      // Logic đơn giản: nếu có cả 2 trường thì hợp lệ
-      if (kanjiOrKana && meaning) {
-        return {
-          kanji: kanjiOrKana,
-          kana: '', // Để trống hoặc sử dụng logic phân tích phức tạp hơn
-          meaning: meaning,
-        };
+      await deleteVocabularySet(user.id, setId)
+      
+      // Cập nhật state cục bộ
+      setVocabularySets(prevSets => prevSets.filter(set => set.id !== setId))
+      
+      // Nếu bộ từ đang chọn bị xóa, hủy chọn
+      if (selectedSet && selectedSet.id === setId) {
+        setSelectedSet(null)
+        setVocabularyWords([])
       }
-      return null;
-    }).filter((word): word is { kanji: string; kana: string; meaning: string } => word !== null);
+      
+      toast({
+        title: 'Thành công!',
+        description: `Đã xóa bộ từ "${setName}".`,
+      })
 
-    if (wordsToImport.length === 0) {
+    } catch (error) {
+      console.error('Error deleting vocabulary set:', error)
+      toast({
+        title: 'Lỗi',
+        description: 'Không thể xóa bộ từ. Vui lòng thử lại.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }, [user, selectedSet, toast])
+
+  // Logic cập nhật bộ từ (giữ nguyên)
+  const handleUpdateSet = useCallback(async (setId: string, newName: string, newDescription: string) => {
+    if (!user) return
+    
+    setIsLoading(true)
+    try {
+      await updateVocabularySet(user.id, setId, { name: newName, description: newDescription })
+
+      // Cập nhật state cục bộ
+      setVocabularySets(prevSets => prevSets.map(set => 
+        set.id === setId ? { ...set, name: newName, description: newDescription } : set
+      ))
+      
+      // Cập nhật selectedSet
+      if (selectedSet && selectedSet.id === setId) {
+        setSelectedSet(prevSet => prevSet ? { ...prevSet, name: newName, description: newDescription } : null)
+      }
+
+      toast({
+        title: 'Thành công!',
+        description: 'Đã cập nhật bộ từ.',
+      })
+
+    } catch (error) {
+      console.error('Error updating vocabulary set:', error)
+      toast({
+        title: 'Lỗi',
+        description: 'Không thể cập nhật bộ từ.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }, [user, selectedSet, toast])
+
+  // ----------------------------------------------------
+  // III. LOGIC QUẢN LÝ TỪ VỰNG (VOCABULARY WORDS)
+  // ----------------------------------------------------
+
+  const handleAddWord = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedSet || !user || !newWordKanji.trim() || !newWordMeaning.trim()) return
+
+    setIsLoading(true)
+    try {
+      const newWord: Omit<VocabularyWord, 'id' | 'difficulty'> = {
+        kanji: newWordKanji.trim(),
+        kana: newWordKana.trim(),
+        meaning: newWordMeaning.trim(),
+        notes: newWordNotes.trim(),
+      }
+      
+      // Thêm từ vào Firestore và nhận lại đối tượng từ đã có ID
+      const wordWithId = await addVocabularyWord(user.id, selectedSet.id, newWord)
+      
+      // Cập nhật state cục bộ
+      setVocabularyWords(prevWords => [wordWithId, ...prevWords])
+      
+      // Reset form
+      setNewWordKanji('')
+      setNewWordKana('')
+      setNewWordMeaning('')
+      setNewWordNotes('')
+
+      toast({
+        title: 'Thành công!',
+        description: `Đã thêm từ: ${wordWithId.kanji}`,
+      })
+      
+    } catch (error) {
+      console.error('Error adding vocabulary word:', error)
+      toast({
+        title: 'Lỗi',
+        description: 'Không thể thêm từ vựng.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }, [user, selectedSet, newWordKanji, newWordKana, newWordMeaning, newWordNotes, toast])
+
+  // Logic chỉnh sửa từ (giữ nguyên)
+  const handleUpdateWord = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedSet || !user || !editingWord) return
+
+    setIsLoading(true)
+    try {
+      const updatedData = {
+        kanji: editKanji.trim(),
+        kana: editKana.trim(),
+        meaning: editMeaning.trim(),
+        notes: editNotes.trim(),
+      }
+      
+      await updateVocabularyWord(user.id, selectedSet.id, editingWord.id, updatedData)
+
+      // Cập nhật state cục bộ
+      setVocabularyWords(prevWords => prevWords.map(word => 
+        word.id === editingWord.id ? { ...word, ...updatedData } as VocabularyWord : word
+      ))
+      
+      // Đóng dialog
+      setIsEditWordOpen(false)
+      setEditingWord(null)
+
+      toast({
+        title: 'Thành công!',
+        description: `Đã cập nhật từ: ${editKanji}`,
+      })
+
+    } catch (error) {
+      console.error('Error updating vocabulary word:', error)
+      toast({
+        title: 'Lỗi',
+        description: 'Không thể cập nhật từ vựng.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }, [user, selectedSet, editingWord, editKanji, editKana, editMeaning, editNotes, toast])
+
+  const handleDeleteWord = useCallback(async (setId: string, wordId: string) => {
+    if (!user || !confirm('Bạn có chắc chắn muốn xóa từ vựng này?')) return
+
+    setIsLoading(true)
+    try {
+      await deleteVocabularyWord(user.id, setId, wordId)
+      
+      // Cập nhật state cục bộ
+      setVocabularyWords(prevWords => prevWords.filter(word => word.id !== wordId))
+      
+      toast({
+        title: 'Thành công!',
+        description: 'Đã xóa từ vựng.',
+      })
+
+    } catch (error) {
+      console.error('Error deleting vocabulary word:', error)
+      toast({
+        title: 'Lỗi',
+        description: 'Không thể xóa từ vựng. Vui lòng thử lại.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }, [user, toast])
+
+  // ----------------------------------------------------
+  // IV. LOGIC BULK IMPORT (Giữ nguyên)
+  // ----------------------------------------------------
+
+  const handleBulkImport = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedSet || !user || !bulkData.trim()) return
+
+    const lines = bulkData.trim().split('\n').filter(line => line.trim() !== '')
+    const newWords: Omit<VocabularyWord, 'id' | 'difficulty'>[] = []
+    
+    // Format: Kanji,Kana,Meaning,Notes (Notes là tùy chọn, chỉ lấy 3 trường chính)
+    for (const line of lines) {
+        const parts = line.split(',').map(p => p.trim());
+        if (parts.length >= 3) {
+            newWords.push({
+                kanji: parts[0],
+                kana: parts[1] || '',
+                meaning: parts[2],
+                notes: parts[3] || '',
+            });
+        }
+    }
+
+    if (newWords.length === 0) {
         toast({
-            title: "Lỗi",
-            description: "Không tìm thấy từ vựng hợp lệ nào trong định dạng 'Từ vựng TAB Nghĩa'.",
-            variant: "destructive",
+            title: 'Lỗi định dạng',
+            description: 'Không tìm thấy từ vựng hợp lệ. Vui lòng sử dụng định dạng: Kanji,Kana,Meaning',
+            variant: 'destructive',
         });
         return;
     }
 
-    setIsLoading(true);
-    try {
-        const count = await addMultipleVocabularyWords(selectedSet.id, userId, wordsToImport);
-        setBulkImportText('');
-        setIsBulkImportOpen(false);
-        fetchWords(selectedSet.id);
-        fetchSets(); 
-        toast({
-            title: "Thành công",
-            description: `Đã thêm thành công ${count} từ vựng mới.`,
-        });
-    } catch (error) {
-        console.error(error);
-        toast({
-            title: "Lỗi",
-            description: "Nhập hàng loạt thất bại.",
-            variant: "destructive",
-        });
-    } finally {
-        setIsLoading(false);
-    }
-  };
+    setBulkImportProgress(`Đang nhập ${newWords.length} từ...`)
 
+    try {
+        // Sử dụng batch write để thêm nhiều từ một lúc (giả định hàm đã có trong firebase.ts)
+        const addedWords = await addVocabularyWord.bulk(user.id, selectedSet.id, newWords)
+        
+        // Cập nhật state cục bộ
+        setVocabularyWords(prevWords => [...addedWords, ...prevWords])
+
+        toast({
+            title: 'Thành công!',
+            description: `Đã nhập thành công ${addedWords.length} từ vào bộ từ "${selectedSet.name}".`,
+        })
+
+        // Reset form và đóng dialog
+        setBulkData('')
+        setIsBulkImportOpen(false)
+
+    } catch (error) {
+        console.error('Error during bulk import:', error)
+        toast({
+            title: 'Lỗi',
+            description: 'Không thể nhập từ vựng số lượng lớn. Vui lòng thử lại.',
+            variant: 'destructive',
+        })
+    } finally {
+        setBulkImportProgress(null)
+    }
+
+  }, [user, selectedSet, bulkData, toast])
+
+  // ----------------------------------------------------
+  // V. RENDER
+  // ----------------------------------------------------
+  
+  const totalWords = vocabularyWords.length
+
+  // Hàm helper để mở dialog chỉnh sửa
+  const openEditDialog = (word: VocabularyWord) => {
+    setEditingWord(word)
+    setEditKanji(word.kanji)
+    setEditKana(word.kana)
+    setEditMeaning(word.meaning)
+    setEditNotes(word.notes || '')
+    setIsEditWordOpen(true)
+  }
+
+
+  if (!user) {
+    return (
+      <Card className="text-center shadow-lg w-full max-w-sm mx-auto">
+        <CardHeader>
+            <CardTitle>Yêu cầu Đăng nhập</CardTitle>
+        </CardHeader>
+        <CardContent>
+            <p className="text-gray-500 mb-4">Bạn cần đăng nhập để quản lý từ vựng.</p>
+        </CardContent>
+    </Card>
+    )
+  }
 
   return (
-    <div className="flex h-full min-h-[calc(100vh-80px)] flex-col"> {/* Đã thêm flex-col để chứa thẻ p */}
-      
-      <div className="flex flex-1">
-        {/* Sidebar - Danh sách Bộ Từ */}
-        <div className="w-1/4 max-w-xs border-r bg-gray-50 dark:bg-gray-900/50 p-4 space-y-4">
-          <h2 className="text-xl font-bold flex items-center">
-            <List className="h-5 w-5 mr-2" /> Bộ Từ Vựng
-          </h2>
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Quản lý Từ vựng</h1>
+      <p className="text-gray-600 dark:text-gray-400">Tạo, chỉnh sửa và sắp xếp các bộ từ vựng cá nhân của bạn.</p>
+
+      {/* DIALOG TẠO BỘ TỪ MỚI */}
+      <Dialog open={isCreateSetOpen} onOpenChange={setIsCreateSetOpen}>
+        <DialogTrigger asChild>
+          <Button className="w-full md:w-auto" onClick={() => { 
+            setNewSetName(''); 
+            setNewSetDescription(''); 
+            setIsCreateSetOpen(true); 
+          }}>
+            <Plus className="h-4 w-4 mr-2" /> Tạo Bộ Từ Mới
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Tạo Bộ Từ Vựng Mới</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreateSet} className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="setName">Tên bộ từ <span className="text-red-500">*</span></Label>
+              <Input
+                id="setName"
+                value={newSetName}
+                onChange={(e) => setNewSetName(e.target.value)}
+                placeholder="Ví dụ: N3 Từ vựng, Từ chuyên ngành IT"
+                required
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="setDescription">Mô tả (Tùy chọn)</Label>
+              <Textarea
+                id="setDescription"
+                value={newSetDescription}
+                onChange={(e) => setNewSetDescription(e.target.value)}
+                placeholder="Mô tả ngắn gọn về bộ từ này"
+              />
+            </div>
+            <Button type="submit" disabled={isLoading || !newSetName.trim()}>
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : 'Tạo Bộ Từ'}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[70vh]">
+        {/* Cột 1: Danh sách Bộ Từ */}
+        <div className="md:col-span-1 flex flex-col space-y-4">
+          <h2 className="text-xl font-semibold border-b pb-2 text-gray-800 dark:text-white">Danh sách Bộ Từ ({vocabularySets.length})</h2>
           
-          {/* Nút Thêm Bộ Từ Mới */}
-          <Dialog open={isAddSetDialogOpen} onOpenChange={setIsAddSetDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="w-full" disabled={isLoading}>
-                <Plus className="h-4 w-4 mr-2" /> Thêm Bộ Từ
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Tạo Bộ Từ Vựng Mới</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <Label htmlFor="set-name">Tên Bộ Từ</Label>
-                <Input 
-                  id="set-name"
-                  value={newSetName}
-                  onChange={(e) => setNewSetName(e.target.value)}
-                  placeholder="Ví dụ: N3 Từ vựng cơ bản"
-                />
-                <Button onClick={handleAddSet} disabled={isLoading || !userId} className="w-full">
-                  {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : 'Tạo Bộ Từ'}
-                </Button>
+          <div className="space-y-2 overflow-y-auto pr-2">
+            {isLoading && vocabularySets.length === 0 ? (
+              <div className="flex justify-center items-center h-24">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
               </div>
-            </DialogContent>
-          </Dialog>
-
-
-          <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-2">
-            {isLoading && sets.length === 0 ? (
-                <div className="text-center text-gray-500">
-                  <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-                  <p className='text-sm mt-2'>Đang tải bộ từ...</p>
-                </div>
-            ) : sets.length === 0 ? (
-              <p className="text-gray-500 text-sm italic text-center">Chưa có bộ từ nào.</p>
+            ) : vocabularySets.length === 0 ? (
+              <p className="text-gray-500 dark:text-gray-400 text-center p-4">
+                Chưa có bộ từ nào.
+              </p>
             ) : (
-              sets.map((set) => (
-                <Card 
-                  key={set.id} 
+              vocabularySets.map((set) => (
+                <Card
+                  key={set.id}
                   className={`cursor-pointer transition-all ${
-                    selectedSet?.id === set.id 
-                      ? 'border-primary border-2 bg-primary/10 dark:bg-primary/20' 
-                      : 'border hover:border-gray-400 dark:hover:border-gray-500 bg-white dark:bg-gray-800'
+                    selectedSet && selectedSet.id === set.id
+                      ? 'border-primary shadow-lg bg-primary/10 dark:bg-primary/20'
+                      : 'hover:border-primary/50 dark:hover:border-gray-600 bg-white dark:bg-gray-800'
                   }`}
-                  onClick={() => {
-                    setSelectedSet(set)
-                    setWords([]) // Xóa từ vựng cũ khi chuyển set
-                    fetchWords(set.id)
-                  }}
+                  onClick={() => setSelectedSet(set)}
                 >
-                  <CardContent className="p-3 flex justify-between items-center">
+                  <CardContent className="p-4 flex justify-between items-start">
                     <div>
-                      <p className="font-medium truncate">{set.name}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">{set.wordCount} từ</p>
+                      <CardTitle className="text-lg font-medium">
+                        {set.name}
+                      </CardTitle>
+                      <CardDescription className="text-sm">
+                        {set.description || 'Không có mô tả'}
+                      </CardDescription>
+                      <Badge variant="secondary" className="mt-2">
+                          <Hash className="h-3 w-3 mr-1" /> {set.totalWords || 0} từ
+                      </Badge>
                     </div>
-                    <div className="flex space-x-2">
-                      {/* Nút Edit/Rename */}
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          // Giả định có hàm handleRenameSet
-                          // handleRenameSet(set.id, set.name)
-                          toast({title: "Tính năng", description: "Tính năng đổi tên đang được phát triển."})
-                        }}
-                      >
-                        <Edit2 className="h-4 w-4 text-gray-500 hover:text-blue-500" />
-                      </Button>
-                      {/* Nút Delete */}
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleDeleteSet(set.id, set.name)
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500 hover:text-red-700" />
-                      </Button>
-                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/50"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteSet(set.id, set.name)
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </CardContent>
                 </Card>
               ))
             )}
           </div>
         </div>
-        
-        {/* Nội dung chính - Danh sách Từ Vựng */}
-        <div className="flex-1 p-4">
-          {selectedSet ? (
-              <Card className="bg-white dark:bg-gray-800 border-0 shadow-lg h-full flex flex-col">
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle className="text-2xl">{selectedSet.name} ({selectedSet.wordCount} từ)</CardTitle>
-                  <div className="space-x-2">
-                      {/* Dialog Thêm Từ Vựng Mới */}
-                      <Dialog open={isAddWordDialogOpen} onOpenChange={setIsAddWordDialogOpen}>
-                          <DialogTrigger asChild>
-                              <Button variant="secondary">
-                                  <Plus className="h-4 w-4 mr-2" /> Thêm Từ Đơn
-                              </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                              <DialogHeader>
-                                  <DialogTitle>Thêm Từ Vựng vào Bộ "{selectedSet.name}"</DialogTitle>
-                              </DialogHeader>
-                              <div className="space-y-4">
-                                  <Label htmlFor="word-kanji">Kanji / Kana</Label>
-                                  <Input 
-                                      id="word-kanji"
-                                      value={newWord.kanji}
-                                      onChange={(e) => setNewWord({...newWord, kanji: e.target.value})}
-                                      placeholder="例: 日本語 (にほんご)"
-                                  />
-                                  <Label htmlFor="word-meaning">Nghĩa</Label>
-                                  <Input 
-                                      id="word-meaning"
-                                      value={newWord.meaning}
-                                      onChange={(e) => setNewWord({...newWord, meaning: e.target.value})}
-                                      placeholder="Ví dụ: Tiếng Nhật"
-                                  />
-                                  <Label htmlFor="word-notes">Ghi chú (Tùy chọn)</Label>
-                                  <Textarea
-                                      id="word-notes"
-                                      value={newWord.notes}
-                                      onChange={(e) => setNewWord({...newWord, notes: e.target.value})}
-                                      placeholder="Ghi chú về ngữ pháp hoặc cách dùng..."
-                                  />
-                                  <Button onClick={handleAddWord} disabled={isLoading || !newWord.kanji.trim() || !newWord.meaning.trim()} className="w-full">
-                                      {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : 'Lưu Từ Vựng'}
-                                  </Button>
-                              </div>
-                          </DialogContent>
-                      </Dialog>
-                      
-                      {/* Dialog Nhập Hàng Loạt */}
-                      <Dialog open={isBulkImportOpen} onOpenChange={setIsBulkImportOpen}>
-                          <DialogTrigger asChild>
-                              <Button variant="outline">
-                                  <Import className="h-4 w-4 mr-2" /> Nhập Hàng Loạt
-                              </Button>
-                          </DialogTrigger>
-                          <DialogContent className='max-w-xl'>
-                              <DialogHeader>
-                                  <DialogTitle>Nhập Hàng Loạt Từ Vựng</DialogTitle>
-                                  <CardDescription>Nhập từ vựng theo định dạng: **Từ vựng [TAB] Nghĩa**. Mỗi từ một dòng.</CardDescription>
-                              </DialogHeader>
-                              <div className="space-y-4">
-                                  <Textarea
-                                      rows={10}
-                                      value={bulkImportText}
-                                      onChange={(e) => setBulkImportText(e.target.value)}
-                                      placeholder="Ví dụ:\n家族\tGia đình\n勉強\tHọc tập\n頑張る\tCố gắng"
-                                  />
-                                  <Button onClick={handleBulkImport} disabled={isLoading || bulkImportText.trim().length === 0} className="w-full">
-                                      {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : `Nhập ${bulkImportText.split('\n').filter(l => l.trim()).length} Dòng`}
-                                  </Button>
-                              </div>
-                          </DialogContent>
-                      </Dialog>
+
+        {/* Cột 2 & 3: Chi tiết và Quản lý Từ vựng */}
+        <div className="md:col-span-2">
+            {selectedSet ? (
+              <Card className="bg-white dark:bg-gray-800 border-0 shadow-lg h-full">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <div className='flex items-center space-x-3'>
+                    <BookOpen className="h-6 w-6 text-primary" />
+                    <CardTitle className="text-2xl font-bold">{selectedSet.name}</CardTitle>
                   </div>
+                  {/* Dialog chỉnh sửa bộ từ */}
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <Edit2 className="h-4 w-4 mr-2" /> Chỉnh sửa
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                      <DialogHeader>
+                        <DialogTitle>Chỉnh sửa Bộ Từ Vựng</DialogTitle>
+                      </DialogHeader>
+                      <EditSetForm 
+                        set={selectedSet} 
+                        onSave={handleUpdateSet}
+                        isLoading={isLoading}
+                      />
+                    </DialogContent>
+                  </Dialog>
                 </CardHeader>
-                <CardContent className="flex-1 overflow-y-auto">
-                  <div className="space-y-3">
-                    {isLoading ? (
-                      <div className="text-center text-gray-500 py-12">
-                        <Loader2 className="h-8 w-8 animate-spin mx-auto" />
-                        <p className='text-md mt-2'>Đang tải từ vựng...</p>
-                      </div>
-                    ) : words.length === 0 ? (
-                      <div className="text-center p-12 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                        <BookOpen className="h-10 w-10 text-gray-400 mx-auto mb-3" />
-                        <h3 className="text-lg font-medium">Bộ từ "{selectedSet.name}" chưa có từ vựng nào.</h3>
-                        <p className="text-gray-600 dark:text-gray-400">Vui lòng thêm từ vựng để bắt đầu học.</p>
-                        <Button onClick={() => setIsAddWordDialogOpen(true)} className="mt-4">
-                            Thêm Từ Vựng Ngay
+                <CardDescription className="px-6 pb-4">
+                  {selectedSet.description || 'Không có mô tả'}
+                </CardDescription>
+
+                {/* Tabs: Thêm Từ / Nhập Số Lượng Lớn / Danh sách Từ */}
+                <CardContent className="p-6 pt-0">
+                  <Tabs defaultValue="addWord" className="w-full">
+                    <TabsList className="grid w-full grid-cols-3">
+                      <TabsTrigger value="addWord">
+                        <Plus className="h-4 w-4 mr-1" /> Thêm Từ
+                      </TabsTrigger>
+                      <TabsTrigger value="wordList">
+                        <List className="h-4 w-4 mr-1" /> Danh sách ({totalWords})
+                      </TabsTrigger>
+                      <TabsTrigger value="bulkImport" onClick={() => {setBulkData(''); setBulkImportProgress(null);}}>
+                        <Import className="h-4 w-4 mr-1" /> Nhập SL
+                      </TabsTrigger>
+                    </TabsList>
+                    
+                    {/* Tab 1: Thêm Từ */}
+                    <TabsContent value="addWord" className="mt-4">
+                      <form onSubmit={handleAddWord} className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="kanji">Kanji/Từ <span className="text-red-500">*</span></Label>
+                          <Input id="kanji" value={newWordKanji} onChange={(e) => setNewWordKanji(e.target.value)} required />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="kana">Kana/Phiên âm</Label>
+                          <Input id="kana" value={newWordKana} onChange={(e) => setNewWordKana(e.target.value)} />
+                        </div>
+                        <div className="space-y-2 col-span-2">
+                          <Label htmlFor="meaning">Nghĩa <span className="text-red-500">*</span></Label>
+                          <Input id="meaning" value={newWordMeaning} onChange={(e) => setNewWordMeaning(e.target.value)} required />
+                        </div>
+                        <div className="space-y-2 col-span-2">
+                          <Label htmlFor="notes">Ghi chú (Tùy chọn)</Label>
+                          <Textarea id="notes" value={newWordNotes} onChange={(e) => setNewWordNotes(e.target.value)} />
+                        </div>
+                        <Button type="submit" className="col-span-2" disabled={isLoading || !newWordKanji.trim() || !newWordMeaning.trim()}>
+                          {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : 'Thêm Từ Vựng'}
                         </Button>
+                      </form>
+                    </TabsContent>
+                    
+                    {/* Tab 2: Danh sách Từ */}
+                    <TabsContent value="wordList" className="mt-4">
+                      <div className="space-y-3 max-h-[30vh] overflow-y-auto pr-2">
+                        {isLoading && totalWords === 0 ? (
+                            <div className="flex justify-center items-center h-24">
+                                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                            </div>
+                        ) : totalWords === 0 ? (
+                          <p className="text-gray-500 dark:text-gray-400 text-center p-4">
+                            Bộ từ này chưa có từ vựng nào.
+                          </p>
+                        ) : (
+                          vocabularyWords.map((word) => (
+                            <Card key={word.id} className="bg-gray-50 dark:bg-gray-900 shadow-sm">
+                              <CardContent className="p-3 flex justify-between items-center">
+                                <div className="flex-1 min-w-0 pr-4">
+                                  <p className="font-semibold text-lg truncate text-gray-900 dark:text-white">{word.kanji}</p>
+                                  <p className="text-sm text-primary dark:text-primary-light truncate">{word.kana}</p>
+                                  <p className="text-sm text-gray-600 dark:text-gray-300 truncate mt-1">{word.meaning}</p>
+                                  {word.notes && (
+                                    <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                      <MessageSquare className="h-3 w-3 mr-1" />
+                                      <span className="truncate">{word.notes}</span>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex space-x-1">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon"
+                                    onClick={() => openEditDialog(word)}
+                                    title="Chỉnh sửa từ"
+                                  >
+                                    <Edit2 className="h-4 w-4 text-primary" />
+                                  </Button>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon"
+                                    onClick={() => handleDeleteWord(selectedSet.id, word.id)}
+                                    title="Xóa từ"
+                                  >
+                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                  </Button>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))
+                        )}
                       </div>
-                    ) : (
-                      words.map((word) => (
-                        <Card key={word.id} className="bg-gray-50 dark:bg-gray-700 border-0 shadow-sm transition-shadow hover:shadow-md">
-                          <CardContent className="p-4 flex justify-between items-center">
-                            <div className="flex-1 min-w-0 pr-4">
-                              <div className="flex items-center space-x-3 mb-1">
-                                <p className="text-lg font-semibold text-primary dark:text-primary-light truncate">{word.kanji}</p>
-                                {word.kana && <Badge variant="secondary" className="text-sm">{word.kana}</Badge>}
-                              </div>
-                              <p className="text-gray-700 dark:text-gray-300 line-clamp-1">{word.meaning}</p>
-                              {word.notes && (
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center">
-                                  <MessageSquare className="h-3 w-3 mr-1" /> {word.notes}
-                                </p>
-                              )}
+                    </TabsContent>
+
+                    {/* Tab 3: Nhập Số Lượng Lớn */}
+                    <TabsContent value="bulkImport" className="mt-4">
+                      <form onSubmit={handleBulkImport} className="grid gap-4">
+                        <Label htmlFor="bulkData" className="text-sm font-medium">
+                          Nhập từ vựng (mỗi từ một dòng, phân tách bằng dấu phẩy)
+                        </Label>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 -mt-2">
+                          Định dạng: **Kanji/Từ, Kana/Phiên âm, Nghĩa, Ghi chú (tùy chọn)**
+                        </p>
+                        <Textarea
+                          id="bulkData"
+                          rows={8}
+                          value={bulkData}
+                          onChange={(e) => setBulkData(e.target.value)}
+                          placeholder="Ví dụ:&#10;食べる, たべる, Ăn&#10;日本語, にほんご, Tiếng Nhật, Ghi chú quan trọng"
+                          required
+                        />
+                        {bulkImportProgress && (
+                            <div className="flex items-center text-sm text-blue-500">
+                                <Loader2 className="h-4 w-4 animate-spin mr-2" /> {bulkImportProgress}
                             </div>
-                            <div className="flex space-x-2 shrink-0">
-                              {/* Nút Edit */}
-                              <Button 
-                                variant="ghost" 
-                                size="icon"
-                                onClick={() => {
-                                  // Giả định hàm handleEditWord(word)
-                                  toast({title: "Tính năng", description: "Tính năng chỉnh sửa từ vựng đang được phát triển."})
-                                }}
-                              >
-                                <Edit2 className="h-4 w-4 text-gray-500" />
-                              </Button>
-                              {/* Nút Delete */}
-                              <Button 
-                                variant="ghost" 
-                                size="icon"
-                                onClick={() => handleDeleteWord(selectedSet.id, word.id)}
-                              >
-                                <Trash2 className="h-4 w-4 text-red-500" />
-                              </Button>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))
-                    )}
-                  </div>
+                        )}
+                        <Button type="submit" disabled={isLoading || bulkImportProgress !== null || !bulkData.trim()}>
+                          <Import className="h-4 w-4 mr-2" /> Nhập {bulkData.trim().split('\n').filter(line => line.trim() !== '').length} Từ
+                        </Button>
+                      </form>
+                    </TabsContent>
+
+                  </Tabs>
                 </CardContent>
               </Card>
             ) : (
@@ -595,7 +728,7 @@ export default function VocabularyManager() {
                 <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-lg font-medium mb-2">Chọn một bộ từ</h3>
                 <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  Vui lòng chọn một bộ từ từ danh sách bên trái để quản lý các từ vựng
+                  Vui lòng chọn một bộ từ từ danh sách bên trái hoặc tạo bộ từ mới.
                 </p>
                 <Button variant="outline" onClick={fetchSets} disabled={isLoading}>
                   {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : 'Tải lại danh sách bộ từ'}
@@ -605,9 +738,103 @@ export default function VocabularyManager() {
           </div>
         </div>
       {/* THẺ <p> ĐƯỢC DI CHUYỂN VÀO TRONG THẺ DIV GỐC */}
-      <p className="mt-8 text-sm text-center text-gray-500 dark:text-gray-400 p-4">
-        **LƯU Ý**: Chế độ Học (Learning Mode) chỉ hoạt động nếu bộ từ đã chọn có ít nhất 4 từ.
+      <p className="mt-8 text-sm text-center text-gray-500 dark:text-gray-500">
+          * Độ khó (Difficulty) sẽ được cập nhật tự động sau mỗi buổi học.
       </p>
+
+      {/* DIALOG CHỈNH SỬA TỪ */}
+      <Dialog open={isEditWordOpen} onOpenChange={setIsEditWordOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Chỉnh sửa Từ Vựng</DialogTitle>
+            <DialogDescription>
+              Cập nhật thông tin cho từ "{editingWord?.kanji}".
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleUpdateWord} className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="editKanji">Kanji/Từ <span className="text-red-500">*</span></Label>
+              <Input
+                id="editKanji"
+                value={editKanji}
+                onChange={(e) => setEditKanji(e.target.value)}
+                required
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="editKana">Kana/Phiên âm</Label>
+              <Input
+                id="editKana"
+                value={editKana}
+                onChange={(e) => setEditKana(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="editMeaning">Nghĩa <span className="text-red-500">*</span></Label>
+              <Input
+                id="editMeaning"
+                value={editMeaning}
+                onChange={(e) => setEditMeaning(e.target.value)}
+                required
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="editNotes">Ghi chú</Label>
+              <Textarea
+                id="editNotes"
+                value={editNotes}
+                onChange={(e) => setEditNotes(e.target.value)}
+              />
+            </div>
+            <Button type="submit" disabled={isLoading || !editKanji.trim() || !editMeaning.trim()}>
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : 'Lưu Thay Đổi'}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
+
+
+// Component con cho việc chỉnh sửa bộ từ (giữ nguyên logic)
+interface EditSetFormProps {
+  set: VocabularySet;
+  onSave: (id: string, newName: string, newDescription: string) => Promise<void>;
+  isLoading: boolean;
+}
+
+const EditSetForm: React.FC<EditSetFormProps> = ({ set, onSave, isLoading }) => {
+  const [name, setName] = useState(set.name);
+  const [description, setDescription] = useState(set.description || '');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave(set.id, name, description);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="grid gap-4 py-4">
+      <div className="grid gap-2">
+        <Label htmlFor="editSetName">Tên bộ từ <span className="text-red-500">*</span></Label>
+        <Input
+          id="editSetName"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+        />
+      </div>
+      <div className="grid gap-2">
+        <Label htmlFor="editSetDescription">Mô tả</Label>
+        <Textarea
+          id="editSetDescription"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+        />
+      </div>
+      <Button type="submit" disabled={isLoading || !name.trim()}>
+        {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : 'Lưu Bộ Từ'}
+      </Button>
+    </form>
+  );
+};
