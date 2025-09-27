@@ -4,7 +4,7 @@
  * Displays vocabulary questions with 4 answer options
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Progress } from './ui/progress'
@@ -12,14 +12,20 @@ import { Badge } from './ui/badge'
 import { 
   CheckCircle, 
   XCircle, 
-  RotateCcw, // Thêm RotateCcw cho nút Restart
-  BookOpen, // Thêm BookOpen cho SessionSummary
+  RotateCcw, 
+  BookOpen, 
   Brain,
   Target,
-  Clock, // Thêm Clock cho Timer
-  Zap // Thêm Zap cho điểm
+  Clock, 
+  Zap,
+  Loader2 // Thêm Loader2
 } from 'lucide-react'
-import { useAuth } from './AuthProvider' // Giả định dùng Auth
+import { Link, useNavigate } from 'react-router-dom' // Thêm Link và useNavigate
+import { useAuth } from './AuthProvider' 
+// ⚡️ IMPORT HÀM FIREBASE THỰC TẾ
+import { getVocabularyWords, saveLearningSession } from '../lib/firebase' 
+// Sửa đổi import để sử dụng giao diện (interfaces) từ firebase.ts
+import type { LearningSessionHistory } from '../lib/firebase'
 
 // ----------------------------------------------------
 // INTERFACES
@@ -39,6 +45,8 @@ interface LearningSession {
   correctAnswers: number
   totalAttempts: number
   sessionPoints: number
+  timeSpent: number // Tính bằng giây
+  startTime: number // Dùng cho tính toán thời gian thực
 }
 
 // ----------------------------------------------------
@@ -47,370 +55,348 @@ interface LearningSession {
 interface SessionSummaryProps {
   session: LearningSession
   onRestart: () => void
+  onNavigate: (path: string) => void
 }
 
-const SessionSummary = ({ session, onRestart }: SessionSummaryProps) => {
-  const { correctAnswers, totalAttempts, sessionPoints, words } = session
-  const percentage = totalAttempts > 0 
-    ? Math.round((correctAnswers / totalAttempts) * 100)
+const SessionSummary: React.FC<SessionSummaryProps> = ({ session, onRestart, onNavigate }) => {
+  const finalScore = session.sessionPoints
+  const totalWords = session.words.length
+  const accuracy = totalWords > 0 
+    ? Math.round((session.correctAnswers / session.totalAttempts) * 100) 
     : 0
-  
+
   return (
-    <Card className="shadow-2xl text-center border-0 bg-white dark:bg-gray-800">
-      <CardHeader className="pt-8">
-        <BookOpen className="h-10 w-10 mx-auto text-primary mb-2" />
-        <CardTitle className="text-3xl font-bold">Phiên Học Đã Hoàn Thành!</CardTitle>
-        <p className="text-gray-600 dark:text-gray-400">
-          Bạn đã ôn tập **{words.length}** từ vựng.
+    <Card className="max-w-xl mx-auto mt-10 p-8 shadow-2xl bg-white dark:bg-gray-800 border-t-4 border-primary">
+      <CardHeader className="text-center">
+        <BookOpen className="h-12 w-12 text-primary mx-auto mb-4" />
+        <CardTitle className="text-3xl font-extrabold text-primary">
+          Hoàn thành Buổi Học!
+        </CardTitle>
+        <p className="text-gray-500 dark:text-gray-400">
+          Bạn đã hoàn thành **{totalWords}** từ vựng trong phiên này.
         </p>
       </CardHeader>
-      <CardContent className="space-y-6 pb-8">
-        
-        <div className="grid grid-cols-3 gap-4 text-center font-medium">
-          <div className="space-y-1 p-3 rounded-lg bg-gray-50 dark:bg-gray-700">
-            <p className="text-sm text-gray-500 dark:text-gray-400">Chính xác</p>
-            <p className="text-xl font-bold text-green-500">{correctAnswers}/{totalAttempts}</p>
-          </div>
-          <div className="space-y-1 p-3 rounded-lg bg-gray-50 dark:bg-gray-700">
-            <p className="text-sm text-gray-500 dark:text-gray-400">Điểm</p>
-            <p className="text-xl font-bold text-yellow-500">{sessionPoints} <Zap className="h-5 w-5 inline-block" /></p>
-          </div>
-          <div className="space-y-1 p-3 rounded-lg bg-gray-50 dark:bg-gray-700">
-            <p className="text-sm text-gray-500 dark:text-gray-400">Tỷ lệ</p>
-            <p className={`text-xl font-bold ${percentage >= 70 ? 'text-primary' : 'text-orange-500'}`}>{percentage}%</p>
-          </div>
+      <CardContent className="mt-4 space-y-4">
+        <div className="flex justify-between items-center p-3 bg-green-50/50 dark:bg-green-900/50 rounded-lg">
+          <Zap className="h-5 w-5 text-green-600" />
+          <span className="text-lg font-bold text-green-700 dark:text-green-300">
+            +{finalScore} Điểm
+          </span>
         </div>
-        
-        <Button onClick={onRestart} className="w-full">
-          <RotateCcw className="h-4 w-4 mr-2" /> Bắt đầu phiên mới
-        </Button>
+        <div className="grid grid-cols-2 gap-4 text-center">
+          <StatCard icon={<Target className="h-5 w-5 text-blue-500" />} label="Chính xác" value={`${accuracy}%`} />
+          <StatCard icon={<Clock className="h-5 w-5 text-indigo-500" />} label="Thời gian" value={`${session.timeSpent}s`} />
+        </div>
+
+        <div className="flex flex-col space-y-3 pt-4">
+          <Button onClick={onRestart} className="w-full">
+            <RotateCcw className="h-4 w-4 mr-2" /> Học lại bộ từ này
+          </Button>
+          <Button variant="outline" onClick={() => onNavigate('/statistics')} className="w-full">
+            <BarChart3 className="h-4 w-4 mr-2" /> Xem Thống kê
+          </Button>
+          <Button variant="outline" onClick={() => onNavigate('/vocabulary')} className="w-full">
+            <BookOpen className="h-4 w-4 mr-2" /> Quản lý Từ vựng
+          </Button>
+        </div>
       </CardContent>
     </Card>
   )
 }
 
+interface StatCardProps {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}
+
+const StatCard: React.FC<StatCardProps> = ({ icon, label, value }) => (
+  <div className="p-3 border rounded-lg flex flex-col items-center">
+    {icon}
+    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{label}</p>
+    <p className="text-xl font-semibold mt-1">{value}</p>
+  </div>
+)
+
 // ----------------------------------------------------
-// MAIN COMPONENT
+// COMPONENT CHÍNH
 // ----------------------------------------------------
+
+// Dữ liệu mockWords đã bị loại bỏ và thay thế bằng state
 
 export default function LearningMode() {
-  const { user } = useAuth() // Giả định useAuth đã được import
-
-  // Mock data (thay thế bằng logic fetch thực tế)
-  const mockWords: VocabularyWord[] = [
-    { id: '1', kanji: '私', kana: 'わたし', meaning: 'Tôi', difficulty: 50 },
-    { id: '2', kanji: '食べる', kana: 'たべる', meaning: 'Ăn', difficulty: 40 },
-    { id: '3', kanji: '行く', kana: 'いく', meaning: 'Đi', difficulty: 60 },
-    { id: '4', kanji: '犬', kana: 'いぬ', meaning: 'Chó', difficulty: 30 },
-    { id: '5', kanji: '本', kana: 'ほん', meaning: 'Sách', difficulty: 70 },
-  ]
-
-  const [session, setSession] = useState<LearningSession>({
-    words: [],
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  
+  // --- TRẠNG THÁI MỚI ---
+  // LƯU Ý: VÌ KHÔNG CÓ ROUTER ID, TÔI DÙNG PLACEHOLDER. 
+  // BẠN PHẢI LẤY ID THỰC TẾ TỪ useParams() HOẶC STATE KHI BỘ TỪ ĐƯỢC CHỌN.
+  const [selectedSetId, setSelectedSetId] = useState<string>('SET_ID_PLACEHOLDER'); 
+  const [wordsToLearn, setWordsToLearn] = useState<VocabularyWord[]>([]); 
+  const [isLoading, setIsLoading] = useState(true);
+  
+  const [showResult, setShowResult] = useState<'correct' | 'incorrect' | null>(null)
+  const [showSummary, setShowSummary] = useState(false)
+  
+  const initialSession: LearningSession = useMemo(() => ({
+    words: wordsToLearn,
     currentIndex: 0,
     correctAnswers: 0,
     totalAttempts: 0,
-    sessionPoints: 0
-  })
-  
-  const [currentWord, setCurrentWord] = useState<VocabularyWord | null>(null)
-  const [options, setOptions] = useState<string[]>([])
-  const [selectedOption, setSelectedOption] = useState<string | null>(null)
-  const [showResult, setShowResult] = useState(false)
-  const [isCorrect, setIsCorrect] = useState<boolean | null>(null)
-  const [showDetails, setShowDetails] = useState(false)
-  const [isTimerActive, setIsTimerActive] = useState(false)
-  const [timeLeft, setTimeLeft] = useState(15) // Giả định 15s/câu
+    sessionPoints: 0,
+    timeSpent: 0,
+    startTime: Date.now()
+  }), [wordsToLearn]);
 
-  // ✅ NEW STATE: Trạng thái hoàn tất phiên học
-  const [isSessionComplete, setIsSessionComplete] = useState(false) 
-
-  // ----------------------------------------------------
-  // UTILS
-  // ----------------------------------------------------
+  const [session, setSession] = useState<LearningSession>(initialSession); 
   
-  const generateOptions = (correctMeaning: string, allWords: VocabularyWord[]) => {
-    const incorrectMeanings = allWords
+  // Reset session khi wordsToLearn thay đổi (Sau khi fetch lần đầu)
+  useEffect(() => {
+      setSession(initialSession);
+  }, [initialSession]);
+
+  // 1. GỌI FIREBASE ĐỂ TẢI TỪ VỰNG THỰC TẾ
+  useEffect(() => {
+    // Chỉ tải khi user.id có, có selectedSetId, và chưa có từ vựng
+    if (!user?.id || !selectedSetId || wordsToLearn.length > 0) return; 
+
+    const fetchWords = async () => {
+        setIsLoading(true);
+        try {
+            const fetchedWords = await getVocabularyWords(user.id, selectedSetId);
+            
+            // Xáo trộn và chỉ lấy 10 từ (cấu hình mặc định)
+            const shuffledWords = fetchedWords
+                                .sort(() => 0.5 - Math.random())
+                                .slice(0, 10); 
+            
+            setWordsToLearn(shuffledWords);
+            
+        } catch (error) {
+            console.error(error);
+            // TODO: Hiển thị toast lỗi
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    fetchWords();
+  }, [user?.id, selectedSetId]); 
+  
+  // Logic để tạo các lựa chọn trả lời sai
+  const currentWord = session.words[session.currentIndex]
+  const answerOptions = useMemo(() => {
+    if (!currentWord) return []
+
+    // Lấy 3 từ vựng khác để làm câu trả lời sai (Ưu tiên các từ cùng bộ từ)
+    const incorrectWords = session.words
+      .filter(w => w.id !== currentWord.id)
+      .sort(() => 0.5 - Math.random()) // Xáo trộn ngẫu nhiên
+      .slice(0, 3) 
       .map(w => w.meaning)
-      .filter(m => m !== correctMeaning)
-    
-    // Chọn ngẫu nhiên 3 đáp án sai
-    const shuffledIncorrect = incorrectMeanings.sort(() => 0.5 - Math.random())
-    const selectedIncorrect = shuffledIncorrect.slice(0, 3)
-    
-    // Kết hợp đáp án đúng và đáp án sai, sau đó xáo trộn
-    const finalOptions = [...selectedIncorrect, correctMeaning]
-    return finalOptions.sort(() => 0.5 - Math.random())
-  }
-  
-  const getScoreColor = () => {
-    const percentage = session.totalAttempts > 0 
-      ? (session.correctAnswers / session.totalAttempts) * 100
-      : 0
-      
-    if (percentage >= 80) return 'text-green-500'
-    if (percentage >= 50) return 'text-yellow-500'
-    return 'text-red-500'
-  }
 
-  // ----------------------------------------------------
-  // LOGIC PHIÊN HỌC
-  // ----------------------------------------------------
+    const options = [
+      currentWord.meaning,
+      ...incorrectWords,
+    ].sort(() => 0.5 - Math.random()) // Xáo trộn các lựa chọn
+
+    return options.slice(0, 4) // Đảm bảo chỉ có 4 lựa chọn
+  }, [currentWord, session.words])
   
-  const startSession = (words: VocabularyWord[]) => {
-    if (words.length === 0) return
-    
-    // Đặt lại trạng thái
-    setSession({
-      words: words,
-      currentIndex: 0,
-      correctAnswers: 0,
-      totalAttempts: 0,
-      sessionPoints: 0
-    })
-    
-    setIsSessionComplete(false) // Bắt đầu phiên học mới
-    setCurrentWord(words[0])
-    setOptions(generateOptions(words[0].meaning, words))
-    setSelectedOption(null)
-    setShowResult(false)
-    setIsCorrect(null)
-    setShowDetails(false)
-    setIsTimerActive(true)
-    setTimeLeft(15)
-  }
-  
-  // ✅ NEW FUNCTION: Xử lý kết thúc phiên học
-  const endSession = () => {
-    setIsTimerActive(false)
-    
-    // Logic lưu điểm (Tạm thời chỉ cập nhật UI)
-    // Cần tích hợp updateUserStatistics từ firebase.ts ở đây trong thực tế
-    
-    // Cập nhật trạng thái hoàn tất để hiển thị Summary
-    setIsSessionComplete(true)
-  }
-  
-  const nextQuestion = () => {
-    // 1. Kiểm tra xem đã là từ cuối cùng chưa
-    if (session.currentIndex >= session.words.length - 1) {
-      endSession() // Gọi hàm kết thúc phiên
-      return
-    }
-    
-    // 2. Chuyển sang từ tiếp theo
-    const nextIndex = session.currentIndex + 1
-    const nextWord = session.words[nextIndex]
-    
+  // Hàm xử lý khi người dùng trả lời
+  const handleAnswerClick = (selectedAnswer: string) => {
+    if (showResult) return
+
+    const isCorrect = selectedAnswer === currentWord.meaning
+
     setSession(prev => ({
       ...prev,
-      currentIndex: nextIndex
+      totalAttempts: prev.totalAttempts + 1,
+      correctAnswers: isCorrect ? prev.correctAnswers + 1 : prev.correctAnswers,
+      sessionPoints: isCorrect ? prev.sessionPoints + 10 : prev.sessionPoints // Giả định 10 điểm
     }))
+
+    setShowResult(isCorrect ? 'correct' : 'incorrect')
     
-    setCurrentWord(nextWord)
-    setOptions(generateOptions(nextWord.meaning, session.words))
-    
-    // 3. Đặt lại trạng thái UI
-    setSelectedOption(null)
-    setShowResult(false)
-    setIsCorrect(null)
-    setShowDetails(false)
-    setIsTimerActive(true)
-    setTimeLeft(15)
+    // TẠI ĐÂY CẦN CẬP NHẬT ĐỘ KHÓ CỦA TỪ VỰNG TRONG FIRESTORE (TODO)
   }
-  
-  const handleAnswerClick = (meaning: string) => {
-    if (showResult || !currentWord) return
+
+  // Chuyển sang câu hỏi tiếp theo
+  const handleNextQuestion = useCallback(() => {
+    setShowResult(null)
+    const isLastQuestion = session.currentIndex >= session.words.length - 1
     
-    setIsTimerActive(false) // Dừng timer ngay khi trả lời
-    setSelectedOption(meaning)
-    setShowResult(true)
-    
-    const correct = meaning === currentWord.meaning
-    setIsCorrect(correct)
-    
-    setSession(prev => {
-      let newPoints = prev.sessionPoints
-      
-      // Cập nhật điểm và thống kê
-      if (correct) {
-        // Tăng điểm, ví dụ: +10 điểm và thêm điểm thưởng thời gian
-        newPoints += 10 + (timeLeft * 2) 
-      }
-      
-      return {
+    if (isLastQuestion) {
+      // 2. KẾT THÚC VÀ LƯU PHIÊN HỌC THỰC TẾ
+      handleFinishSession();
+    } else {
+      setSession(prev => ({
         ...prev,
-        correctAnswers: prev.correctAnswers + (correct ? 1 : 0),
-        totalAttempts: prev.totalAttempts + 1,
-        sessionPoints: newPoints
-      }
-    })
+        currentIndex: prev.currentIndex + 1,
+      }))
+    }
+  }, [session.currentIndex, session.words.length]);
+
+  // Hàm xử lý kết thúc và lưu phiên học
+  const handleFinishSession = async () => {
+    if (!user) return;
+
+    // Tính toán thời gian thực
+    const timeInSeconds = Math.round((Date.now() - session.startTime) / 1000);
     
-    // Nếu trả lời sai, hiển thị chi tiết từ đó
-    if (!correct) {
-      setShowDetails(true)
+    const finalSessionData: LearningSessionHistory = {
+        id: '', // ID sẽ được Firebase tạo
+        userId: user.id,
+        wordsLearned: session.totalAttempts,
+        points: session.sessionPoints,
+        accuracy: session.totalAttempts > 0 
+            ? session.correctAnswers / session.totalAttempts 
+            : 0,
+        timeSpent: timeInSeconds, 
+        date: new Date().toISOString(), // Dùng Date object cho hàm save
+        setId: selectedSetId,
+    } as any; // Cast tạm thời vì SessionData trong firebase.ts thiếu setId
+
+    try {
+        await saveLearningSession({
+             ...finalSessionData,
+             date: new Date(finalSessionData.date),
+        });
+        // TODO: Hiển thị toast thành công: "Đã lưu kết quả phiên học!"
+        
+        // Cập nhật state session với thời gian thực
+        setSession(prev => ({ ...prev, timeSpent: timeInSeconds }));
+
+    } catch (error) {
+        console.error('Lưu phiên học thất bại:', error);
+        // TODO: Hiển thị toast lỗi
     }
+
+    setShowSummary(true); // Hiển thị summary
+  };
+
+  const handleRestart = () => {
+    setSession(prev => ({
+      ...initialSession,
+      words: prev.words.sort(() => 0.5 - Math.random()), // Xáo trộn lại
+      startTime: Date.now() // Reset thời gian
+    }))
+    setShowSummary(false)
   }
 
-  // ----------------------------------------------------
-  // EFFECTS
-  // ----------------------------------------------------
+  const getScoreColor = () => {
+    const accuracy = session.totalAttempts > 0 
+      ? session.correctAnswers / session.totalAttempts 
+      : 0
+    if (accuracy >= 0.75) return 'text-green-500 dark:text-green-400'
+    if (accuracy >= 0.5) return 'text-yellow-500 dark:text-yellow-400'
+    return 'text-red-500 dark:text-red-400'
+  }
   
-  // Khởi tạo phiên học đầu tiên
-  useEffect(() => {
-    // Tải dữ liệu từ vựng từ mock data khi component mount
-    startSession(mockWords)
-  }, [])
-  
-  // Timer effect
-  useEffect(() => {
-    if (!isTimerActive || timeLeft <= 0) {
-      if (timeLeft === 0 && !showResult) {
-        // Hết giờ, coi như trả lời sai
-        handleAnswerClick('Hết giờ - câu trả lời sai') 
-        setShowDetails(true) // Hiển thị chi tiết
-      }
-      return
-    }
-
-    const timerId = setInterval(() => {
-      setTimeLeft(prevTime => prevTime - 1)
-    }, 1000)
-
-    return () => clearInterval(timerId)
-  }, [isTimerActive, timeLeft, showResult])
-  
-  // Xử lý khi user không có
-  if (!user) {
-    // Trả về màn hình loading hoặc màn hình chờ AuthModal (sẽ được handle ở Shell.tsx)
-    // Tạm thời hiển thị loading để tránh lỗi
+  // 3. HIỂN THỊ TRẠNG THÁI TẢI
+  if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center p-8">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
-        <span className="ml-2 text-gray-500">Đang chờ xác thực...</span>
-      </div>
-    )
+        <div className="flex h-96 items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin mr-2 text-primary" />
+            <p className="text-gray-500 dark:text-gray-400">Đang tải từ vựng cho phiên học...</p>
+        </div>
+    );
   }
 
-  // ----------------------------------------------------
-  // RENDER
-  // ----------------------------------------------------
-  
-  if (session.words.length === 0) {
+  if (!isLoading && wordsToLearn.length === 0) {
     return (
-      <div className="p-4 md:p-8 max-w-4xl mx-auto text-center">
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle>Chưa có từ vựng</CardTitle>
-          </CardHeader>
-          <CardContent>
-            Vui lòng thêm từ vựng vào kho từ của bạn để bắt đầu học.
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-  
-  if (!currentWord) {
-    return null // Hoặc loading
-  }
-
-  // ✅ LOGIC HIỂN THỊ CÓ ĐIỀU KIỆN
-  return (
-    <div className="p-4 md:p-8 max-w-4xl mx-auto">
-      
-      {isSessionComplete ? (
-        // 1. HIỂN THỊ TÓM TẮT PHIÊN HỌC
-        <SessionSummary 
-          session={session} 
-          onRestart={() => startSession(mockWords)} 
-        />
-      ) : (
-        // 2. HIỂN THỊ UI CÂU HỎI BÌNH THƯỜNG
-        <>
-          {/* Progress Bar */}
-          <div className="flex items-center space-x-4 mb-6">
-            <Progress 
-              value={(session.currentIndex / session.words.length) * 100} 
-              className="flex-1 h-3" 
-            />
-            <Badge variant="secondary" className="font-semibold px-3 py-1">
-              Câu {session.currentIndex + 1} / {session.words.length}
-            </Badge>
-          </div>
-          
-          {/* Question Card */}
-          <Card className={`shadow-xl transition-all duration-300 ${isCorrect === true ? 'border-green-400' : isCorrect === false ? 'border-red-400' : 'border-gray-200'} bg-white dark:bg-gray-800`}>
-            <CardHeader className="flex flex-row justify-between items-start pb-4">
-              <CardTitle className="text-4xl md:text-5xl font-extrabold text-primary">
-                {currentWord.kanji}
-              </CardTitle>
-              <div className="flex items-center space-x-2 text-xl font-bold">
-                <Clock className="h-5 w-5 text-gray-500" />
-                <span className={timeLeft <= 5 ? 'text-red-500 animate-pulse' : 'text-primary'}>{timeLeft}s</span>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-2xl font-medium text-gray-600 dark:text-gray-300">
-                {currentWord.kana}
-              </p>
-              
-              {showDetails && (
-                <div className="border-t pt-4 mt-4 dark:border-gray-700">
-                  <p className="text-base text-gray-700 dark:text-gray-300">
-                    <span className="font-semibold text-primary">Nghĩa chính:</span> {currentWord.meaning}
-                  </p>
-                  {currentWord.notes && (
-                    <p className="text-sm text-gray-500 mt-1">
-                      <span className="font-semibold">Ghi chú:</span> {currentWord.notes}
-                    </p>
-                  )}
-                </div>
-              )}
+        <Card className="max-w-xl mx-auto mt-10">
+            <CardHeader><CardTitle>Không tìm thấy từ vựng</CardTitle></CardHeader>
+            <CardContent>
+                <p>Bộ từ này chưa có từ vựng nào, hoặc bạn chưa chọn bộ từ. Vui lòng thêm từ vựng hoặc <Link to="/vocabulary" className="text-primary hover:underline">quay lại trang Quản lý Từ vựng</Link>.</p>
             </CardContent>
-          </Card>
-          
-          {/* Options */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-6">
-            {options.map((option, index) => {
-              const isCorrectOption = option === currentWord.meaning
-              const isSelected = option === selectedOption
-              
-              let variant: 'default' | 'outline' | 'secondary' | 'ghost' = 'outline'
-              let className = ''
-              
-              if (showResult) {
-                if (isCorrectOption) {
-                  className = 'bg-green-100 border-green-500 text-green-700 dark:bg-green-900/50 dark:border-green-400 dark:text-green-300'
-                } else if (isSelected && !isCorrectOption) {
-                  className = 'bg-red-100 border-red-500 text-red-700 dark:bg-red-900/50 dark:border-red-400 dark:text-red-300'
-                } else {
-                  className = 'bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
-                }
-              }
+        </Card>
+    );
+  }
 
-              return (
-                <Button 
-                  key={index}
-                  variant={variant}
-                  className={`h-auto p-4 justify-start text-left text-base ${className}`}
-                  onClick={() => handleAnswerClick(option)}
-                  disabled={showResult}
-                >
-                  <span className="font-semibold mr-3">{String.fromCharCode(65 + index)}.</span>
-                  <span className="flex-1">{option}</span>
-                  {showResult && (isCorrectOption ? <CheckCircle className="h-5 w-5 ml-2" /> : isSelected && <XCircle className="h-5 w-5 ml-2" />)}
-                </Button>
-              )
-            })}
+  if (showSummary) {
+    return <SessionSummary session={session} onRestart={handleRestart} onNavigate={navigate} />
+  }
+
+  // Render chính
+  return (
+    <div className="max-w-xl mx-auto p-4 md:p-0">
+      <h2 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">Chế độ Học tập</h2>
+      
+      {/* Progress Bar */}
+      <div className="mb-6">
+        <div className="flex justify-between text-sm font-medium mb-1 text-gray-600 dark:text-gray-400">
+          <span>Tiến trình</span>
+          <span>
+            {session.currentIndex + 1} / {session.words.length}
+          </span>
+        </div>
+        <Progress 
+          value={((session.currentIndex + 1) / session.words.length) * 100} 
+          className="h-2" 
+        />
+      </div>
+
+      {/* Question Card */}
+      <Card className="bg-white dark:bg-gray-800 shadow-xl border-t-4 border-primary">
+        <CardHeader>
+          <div className="flex justify-between items-center">
+             <CardTitle className="text-2xl md:text-3xl font-extrabold text-primary">
+                {currentWord?.kanji || currentWord?.kana}
+             </CardTitle>
+             <Badge variant="secondary" className="text-md">
+                <Zap className="h-4 w-4 mr-1 fill-yellow-400 stroke-yellow-500" /> +10 XP
+             </Badge>
           </div>
+          <CardDescription className="text-lg mt-1">
+            {currentWord?.kana && currentWord.kana !== currentWord.kanji ? currentWord.kana : ''}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
           
+          {/* Answer Options */}
+          <div className="space-y-3">
+            {answerOptions.map((option, index) => (
+              <Button 
+                key={index}
+                variant="outline"
+                className={`w-full h-auto py-3 text-left justify-start text-base font-normal transition-colors
+                  ${showResult === 'correct' && option === currentWord.meaning 
+                    ? 'bg-green-100 dark:bg-green-900/50 border-green-500 hover:bg-green-100 dark:hover:bg-green-900/50' 
+                    : ''}
+                  ${showResult === 'incorrect' && option === selectedAnswer 
+                    ? 'bg-red-100 dark:bg-red-900/50 border-red-500 hover:bg-red-100 dark:hover:bg-red-900/50' 
+                    : ''}
+                  ${showResult && option === currentWord.meaning && showResult !== 'correct'
+                    ? 'border-green-500' // Highlight đáp án đúng sau khi trả lời sai
+                    : ''}
+                `}
+                onClick={() => handleAnswerClick(option)}
+                disabled={!!showResult}
+              >
+                {showResult && (
+                  <span className="mr-3">
+                    {option === currentWord.meaning ? (
+                      <CheckCircle className="h-5 w-5 text-green-500 fill-green-100 dark:fill-green-900" />
+                    ) : option === selectedAnswer ? (
+                      <XCircle className="h-5 w-5 text-red-500 fill-red-100 dark:fill-red-900" />
+                    ) : (
+                      <Brain className="h-5 w-5 text-gray-400" />
+                    )}
+                  </span>
+                )}
+                <span className="flex-1">{option}</span>
+              </Button>
+            ))}
+          </div>
+
           {/* Action Buttons */}
-          <div className="flex flex-col space-y-3 mt-6">
+          <div className="space-y-3 pt-2">
             {showResult && (
               <Button 
-                className="w-full"
-                onClick={nextQuestion} // Logic này sẽ gọi endSession nếu là từ cuối cùng
+                className="w-full" 
+                onClick={handleNextQuestion}
+                disabled={session.currentIndex === session.words.length}
               >
                 {session.currentIndex < session.words.length - 1 ? 'Câu tiếp theo' : 'Hoàn thành'}
               </Button>
@@ -448,8 +434,8 @@ export default function LearningMode() {
               </div>
             </CardContent>
           </Card>
-        </>
-      )}
+        </CardContent>
+      </Card>
     </div>
   )
 }
