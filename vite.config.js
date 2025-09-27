@@ -3,12 +3,13 @@ import react from '@vitejs/plugin-react'
 import path from 'path' 
 
 export default defineConfig({
-  // ✅ THÊM DÒNG NÀY
+  // ✅ THÊM DÒNG NÀY ĐỂ ĐẢM BẢO ĐƯỜNG DẪN TƯƠNG ĐỐI
   base: './', 
   
   plugins: [react()],
   
   resolve: {
+    // Đảm bảo alias vẫn hoạt động
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
