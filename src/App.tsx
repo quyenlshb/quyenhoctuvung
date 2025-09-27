@@ -1,35 +1,27 @@
-// File: src/App.tsx
 import { Route, Routes } from 'react-router-dom'
 
-// 1. IMPORT TRANG
+// Trang
 import HomePage from './pages/Home'
 import SettingsPage from './pages/Settings'
 import StatisticsPage from './pages/Statistics'
 import LearningMode from './components/LearningMode'
 import VocabularyManager from './components/VocabularyManager'
 
-// 2. IMPORT SHELL
+// Shell
 import Shell from './components/Shell'
 
-// 3. IMPORT AUTH
-import { AuthProvider, useAuthProvider, AuthModal } from './components/AuthProvider'
+// Auth
+import { AuthProvider, useAuthProvider } from './components/AuthProvider'
 
-// 4. IMPORT TOASTER
+// Toaster
 import { Toaster } from './components/ui/toaster'
 
 export default function App() {
-  // Lấy context auth
   const authContext = useAuthProvider()
 
   return (
     <AuthProvider value={authContext}>
-      {/* Modal đăng nhập/đăng ký */}
-      <AuthModal 
-        showAuthForm={authContext.showAuthForm} 
-        setShowAuthForm={authContext.showAuthModal} 
-      />
-
-      {/* Routes chung với Shell */}
+      {/* Routes */}
       <Routes>
         <Route path="/" element={<Shell />}>
           <Route index element={<HomePage />} />
@@ -40,7 +32,6 @@ export default function App() {
         </Route>
       </Routes>
 
-      {/* Toaster */}
       <Toaster />
     </AuthProvider>
   )
