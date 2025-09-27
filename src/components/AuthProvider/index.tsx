@@ -1,15 +1,33 @@
+// File: src/components/AuthProvider/index.tsx
 import { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react'
-import { auth, googleProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, signOut, onAuthStateChanged, saveUserData, getUserData } from '../../lib/firebase'
+import {
+  auth,
+  googleProvider,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  signOut,
+  onAuthStateChanged,
+  saveUserData,
+  getUserData
+} from '../../lib/firebase'
 import { User, AuthContextType } from './types'
 
+// --------------------------
+// TẠO CONTEXT
+// --------------------------
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+// Hook truy cập context
 export function useAuth() {
   const context = useContext(AuthContext)
   if (!context) throw new Error('useAuth must be used within an AuthProvider')
   return context
 }
 
+// --------------------------
+// Hook chính: useAuthProvider
+// --------------------------
 export function useAuthProvider() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
@@ -123,7 +141,15 @@ export function useAuthProvider() {
   }
 }
 
+// --------------------------
+// AuthProvider Component
+// --------------------------
 export function AuthProvider({ children, value }: { children: ReactNode, value: ReturnType<typeof useAuthProvider> }) {
   const contextValue = useMemo(() => value, [value])
   return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
 }
+
+// --------------------------
+// Export AuthModal để App.tsx import
+// --------------------------
+export { default as AuthModal } from './AuthModal'
