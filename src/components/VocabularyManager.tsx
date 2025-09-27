@@ -216,46 +216,53 @@ export default function VocabularyManager() {
   }, [user, selectedSet, toast])
 
   // ----------------- Bulk Import -----------------
-  const handleBulkImport = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!selectedSet || !user || !bulkData.trim()) return
+  // ----------------- Bulk Import -----------------
+const handleBulkImport = useCallback(async (e: React.FormEvent) => {
+  e.preventDefault()
+  if (!selectedSet || !user || !bulkData.trim()) return
 
-    const lines = bulkData.trim().split('\n').filter(line => line.trim() !== '')
-    const newWords: Omit<VocabularyWord, 'id' | 'difficulty' | 'lastReviewed'>[] = []
+  const lines = bulkData.trim().split('\n').filter(line => line.trim() !== '')
+  const newWords: Omit<VocabularyWord, 'id' | 'difficulty' | 'lastReviewed'>[] = []
 
-    for (const line of lines) {
-      const parts = line.split(',').map(p => p.trim())
-      if (parts.length >= 3) {
-        newWords.push({
-          kanji: parts[0],
-          kana: parts[1] || '',
-          meaning: parts[2],
-          notes: parts[3] || '',
-        })
-      }
+  for (const line of lines) {
+    // Tách dòng theo khoảng trắng
+    const [kanji, kana, ...meaningParts] = line.trim().split(/\s+/)
+    if (kanji && kana && meaningParts.length > 0) {
+      newWords.push({
+        kanji,
+        kana,
+        meaning: meaningParts.join(' '),
+        notes: '', // Không có ghi chú trong bulk import
+      })
     }
+  }
 
-    if (newWords.length === 0) {
-      toast({ title: 'Lỗi định dạng', description: 'Định dạng phải là Kanji,Kana,Nghĩa[,Ghi chú]', variant: 'destructive' })
-      return
-    }
+  if (newWords.length === 0) {
+    toast({ 
+      title: 'Lỗi định dạng', 
+      description: 'Định dạng phải là: Kanji Kana Nghĩa', 
+      variant: 'destructive' 
+    })
+    return
+  }
 
-    setBulkImportProgress(`Đang nhập ${newWords.length} từ...`)
+  setBulkImportProgress(`Đang nhập ${newWords.length} từ...`)
 
-    try {
-      const addedWords = await bulkAddVocabularyWords(user.id, selectedSet.id, newWords)
-      setVocabularyWords(prev => [...addedWords, ...prev])
-      setSelectedSet(prev => prev ? { ...prev, totalWords: (prev.totalWords || 0) + addedWords.length } : null)
-      setVocabularySets(prev => prev.map(set => set.id === selectedSet.id ? { ...set, totalWords: (set.totalWords || 0) + addedWords.length } : set))
-      toast({ title: 'Thành công!', description: `Đã nhập ${addedWords.length} từ.` })
-      setBulkData(''); setIsBulkImportOpen(false)
-    } catch (error) {
-      console.error('Error during bulk import:', error)
-      toast({ title: 'Lỗi', description: 'Không thể nhập từ số lượng lớn.', variant: 'destructive' })
-    } finally {
-      setBulkImportProgress(null)
-    }
-  }, [user, selectedSet, bulkData, toast])
+  try {
+    const addedWords = await bulkAddVocabularyWords(user.id, selectedSet.id, newWords)
+    setVocabularyWords(prev => [...addedWords, ...prev])
+    setSelectedSet(prev => prev ? { ...prev, totalWords: (prev.totalWords || 0) + addedWords.length } : null)
+    setVocabularySets(prev => prev.map(set => set.id === selectedSet.id ? { ...set, totalWords: (set.totalWords || 0) + addedWords.length } : set))
+    toast({ title: 'Thành công!', description: `Đã nhập ${addedWords.length} từ.` })
+    setBulkData(''); setIsBulkImportOpen(false)
+  } catch (error) {
+    console.error('Error during bulk import:', error)
+    toast({ title: 'Lỗi', description: 'Không thể nhập từ số lượng lớn.', variant: 'destructive' })
+  } finally {
+    setBulkImportProgress(null)
+  }
+}, [user, selectedSet, bulkData, toast])
+
   // ----------------- Render -----------------
   return (
     <div className="space-y-6">
