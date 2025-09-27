@@ -1,4 +1,4 @@
-// App.tsx
+// src/App.tsx
 import { Route, Routes } from 'react-router-dom'
 
 // 1. IMPORT TRANG
@@ -12,18 +12,18 @@ import VocabularyManager from './components/VocabularyManager'
 import Shell from './components/Shell'
 
 // 3. IMPORT AUTH
-import { AuthProvider, useAuthProvider, AuthModal } from './components/auth'
+import { useAuth } from './components/auth'
+import AuthModal from './components/auth/AuthModal' // modal riêng
 
 export default function App() {
-  // logic Firebase + state
-  const authContext = useAuthProvider()
+  const { showAuthForm, showAuthModal } = useAuth() // lấy context hiện tại
 
   return (
-    <AuthProvider value={authContext}>
+    <>
       {/* Modal đăng nhập/đăng ký */}
       <AuthModal 
-        showAuthForm={authContext.showAuthForm} 
-        setShowAuthForm={authContext.showAuthModal} 
+        showAuthForm={showAuthForm} 
+        setShowAuthForm={showAuthModal} 
       />
 
       {/* Routes chung với Shell */}
@@ -36,6 +36,6 @@ export default function App() {
           <Route path="vocabulary" element={<VocabularyManager />} />
         </Route>
       </Routes>
-    </AuthProvider>
+    </>
   )
 }
