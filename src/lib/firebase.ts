@@ -52,6 +52,17 @@ export const db = getFirestore(app);
 export const googleProvider = new GoogleAuthProvider();
 
 // ----------------------------------------------------
+// ✅ THAY ĐỔI 1: XUẤT KHẨU CÁC HÀM FIREBASE SDK BỊ THIẾU
+// ----------------------------------------------------
+export { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signInWithPopup, 
+  signOut, 
+  onAuthStateChanged 
+};
+
+// ----------------------------------------------------
 // FIRESTORE USERS (Giữ nguyên)
 // ----------------------------------------------------
 
@@ -87,7 +98,7 @@ export const getUserData = async (userId: string) => {
 
 
 // ----------------------------------------------------
-// FIRESTORE VOCABULARY SETS (ĐÃ CẬP NHẬT)
+// FIRESTORE VOCABULARY SETS (Giữ nguyên)
 // ----------------------------------------------------
 
 // ✅ ĐÃ SỬA: Thêm userId làm tham số bắt buộc và đưa vào document
@@ -277,6 +288,50 @@ export const deleteVocabularyWord = async (setId: string, wordId: string, userId
     throw new Error('Xóa từ vựng thất bại');
   }
 };
+
+
+// ----------------------------------------------------
+// ✅ THAY ĐỔI 2: THÊM VÀ XUẤT KHẨU CÁC HÀM LEARNING SESSIONS
+// ----------------------------------------------------
+
+/**
+ * Lưu một phiên học mới vào Firestore.
+ * Cần cho component LearningMode.tsx.
+ */
+export const saveLearningSession = async (userId: string, session: any) => {
+  try {
+    // Lưu session vào subcollection 'learningSessions' của user
+    const sessionRef = collection(db, 'users', userId, 'learningSessions');
+    await addDoc(sessionRef, {
+      ...session,
+      date: Timestamp.fromDate(new Date()),
+      userId: userId // Cần cho Security Rules
+    });
+  } catch (error) {
+    console.error('Error saving learning session:', error);
+    throw new Error('Lưu phiên học thất bại');
+  }
+};
+
+/**
+ * Lấy lịch sử các phiên học của người dùng.
+ * Cần cho component Statistics.tsx.
+ */
+export const getLearningSessions = async (userId: string) => {
+  try {
+    const sessionsRef = collection(db, 'users', userId, 'learningSessions');
+    const q = query(sessionsRef, orderBy('date', 'desc'));
+    const sessionsSnap = await getDocs(q);
+
+    return sessionsSnap.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }))
+  } catch (error) {
+    console.error('Error getting learning sessions:', error);
+    throw new Error('Tải phiên học thất bại');
+  }
+}
 
 // ----------------------------------------------------
 // FIRESTORE STATISTICS (Giữ nguyên)
