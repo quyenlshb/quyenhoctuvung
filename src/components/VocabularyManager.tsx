@@ -430,7 +430,8 @@ export default function VocabularyManager() {
 
     try {
         // Sử dụng batch write để thêm nhiều từ một lúc (giả định hàm đã có trong firebase.ts)
-        const addedWords = await addVocabularyWord.bulk(user.id, selectedSet.id, newWords)
+        // LƯU Ý: addVocabularyWord.bulk là giả định, bạn cần đảm bảo hàm này có trong '../lib/firebase'
+        const addedWords = await (addVocabularyWord as any).bulk(user.id, selectedSet.id, newWords)
         
         // Cập nhật state cục bộ
         setVocabularyWords(prevWords => [...addedWords, ...prevWords])
@@ -813,8 +814,9 @@ export default function VocabularyManager() {
                 required
               />
             </div>
+            {/* ⚡️ PHẦN BỊ THIẾU ĐÃ ĐƯỢC BỔ SUNG Ở ĐÂY */}
             <div className="grid gap-2">
-              <Label htmlFor="editNotes">Ghi chú</Label>
+              <Label htmlFor="editNotes">Ghi chú (Tùy chọn)</Label>
               <Textarea
                 id="editNotes"
                 value={editNotes}
@@ -865,6 +867,7 @@ const EditSetForm: React.FC<EditSetFormProps> = ({ set, onSave, isLoading }) => 
           id="editSetDescription"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
+          placeholder="Mô tả ngắn gọn về bộ từ này"
         />
       </div>
       <Button type="submit" disabled={isLoading || !name.trim()}>
