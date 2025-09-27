@@ -3,8 +3,8 @@ import react from '@vitejs/plugin-react'
 import path from 'path' 
 
 export default defineConfig({
-  // ✅ THÊM DÒNG NÀY ĐỂ ĐẢM BẢO ĐƯỜNG DẪN TƯƠNG ĐỐI
-  base: '/', 
+
+  base: './', 
   
   plugins: [react()],
   
