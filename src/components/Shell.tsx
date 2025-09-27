@@ -1,29 +1,14 @@
-import { useState } from 'react'
-import { useAuth } from './AuthProvider'
-import { Button } from './ui/button'
-import { AuthModal } from './AuthProvider'
+// src/components/Shell.tsx
+import React from 'react'
+import Sidebar from './Sidebar'
 
-export default function Shell() {
-  const { user, logout, showAuthModal, showAuthForm } = useAuth()
-
+export default function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div>
-      <header>
-        <h1>Nihongo App</h1>
-        {!user ? (
-          <Button onClick={() => showAuthModal(true)}>Đăng nhập</Button>
-        ) : (
-          <Button onClick={logout}>Đăng xuất</Button>
-        )}
-      </header>
-
-      {/* Nội dung trang */}
-      <main>
-        {/* ... Outlet hoặc nội dung chính */}
+    <div className="flex min-h-screen">
+      <Sidebar /> {/* Giữ các nút Trang chủ, Chế độ học, Quản lý từ vựng */}
+      <main className="flex-1 p-4 bg-gray-50 dark:bg-gray-900">
+        {children}
       </main>
-
-      {/* Modal sẽ hiện khi showAuthForm === true */}
-      {showAuthForm && <AuthModal showAuthForm={showAuthForm} setShowAuthForm={showAuthModal} />}
     </div>
   )
 }

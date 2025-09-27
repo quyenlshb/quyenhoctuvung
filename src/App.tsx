@@ -1,57 +1,30 @@
-import React, { useState } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider, useAuth } from './components/AuthProvider'
-import Home from './pages/Home'
-import LearningMode from './components/LearningMode'
-import VocabularyManager from './components/VocabularyManager'
-import { Toaster } from './components/ui/toaster'
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import Sidebar from './components/Sidebar';
+import Home from './pages/Home';
+// import các page khác khi cần
+// import Learn from './components/LearningMode';
+// import Vocabulary from './components/VocabularyManager';
 
-function RequireAuth({ children }: { children: JSX.Element }) {
-  const { user } = useAuth()
-  if (!user) {
-    return <Navigate to="/" replace />
-  }
-  return children
-}
-
-function MainApp() {
-  const { user, openAuthModal } = useAuth()
-
+function App() {
   return (
-    <>
-      <Routes>
-        <Route
-          path="/"
-          element={
-            <Home onLoginClick={openAuthModal} />
-          }
-        />
-        <Route
-          path="/learn/:setId"
-          element={
-            <RequireAuth>
-              <LearningMode />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/vocabulary"
-          element={
-            <RequireAuth>
-              <VocabularyManager />
-            </RequireAuth>
-          }
-        />
-      </Routes>
-      <Toaster />
-    </>
-  )
+    <Router>
+      <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
+        {/* Sidebar bên trái */}
+        <Sidebar />
+
+        {/* Nội dung chính */}
+        <div className="flex-1 p-4">
+          <Routes>
+            <Route path="/" element={<Home />} />
+            {/* Các route khác */}
+            {/* <Route path="/learn" element={<Learn />} /> */}
+            {/* <Route path="/vocabulary" element={<Vocabulary />} /> */}
+          </Routes>
+        </div>
+      </div>
+    </Router>
+  );
 }
 
-export default function App() {
-  return (
-    <AuthProvider>
-      <MainApp />
-    </AuthProvider>
-  )
-}
+export default App;

@@ -1,25 +1,17 @@
-// src/main.tsx
 import React from 'react';
-import ReactDOM from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
+import { createRoot } from 'react-dom/client';
 import App from './App';
-import './shadcn.css'; // CSS của bạn
+import './styles/shadcn.css'; // import đúng file css
 
-// Tìm phần tử root trong DOM
-const rootElement = document.getElementById('root');
+const container = document.getElementById('root');
 
-if (!rootElement) {
-  throw new Error('Root element not found. Hãy chắc chắn rằng index.html có <div id="root"></div>');
+if (!container) {
+  throw new Error('Root container not found');
 }
 
-// Tạo root React 18
-const root = ReactDOM.createRoot(rootElement);
-
-// Render ứng dụng với Router
+const root = createRoot(container);
 root.render(
   <React.StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
+    <App />
   </React.StrictMode>
 );

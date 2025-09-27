@@ -1,27 +1,27 @@
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
-import { Button } from '../components/ui/button'
-import { Badge } from '../components/ui/badge'
-import { useAuth } from '../components/AuthProvider'
-import { getVocabularySets } from '../lib/firebase'
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Button } from '../components/ui/button';
+import { Badge } from '../components/ui/badge';
+import { useAuth } from '../components/AuthProvider';
+import { getVocabularySets } from '../lib/firebase';
 
 export default function Home() {
-  const { user, showAuthModal } = useAuth() // Lấy showAuthModal
-  const navigate = useNavigate()
-  const [sets, setSets] = useState<any[]>([])
+  const { user, showAuthModal } = useAuth();
+  const navigate = useNavigate();
+  const [sets, setSets] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!user) return
+    if (!user) return;
     const fetchSets = async () => {
-      const data = await getVocabularySets(user.id)
-      setSets(data)
-    }
-    fetchSets()
-  }, [user])
+      const data = await getVocabularySets(user.id);
+      setSets(data);
+    };
+    fetchSets();
+  }, [user]);
 
   return (
-    <div className="flex flex-col items-center justify-start min-h-screen p-4 bg-gray-50 dark:bg-gray-900 space-y-6">
+    <div className="flex flex-col items-center justify-start space-y-6">
       {/* Card chào mừng */}
       <Card className="w-full max-w-xl text-center shadow-lg transition-all duration-300 transform hover:scale-105">
         <CardContent className="p-8">
@@ -30,8 +30,7 @@ export default function Home() {
           </h1>
           {user ? (
             <p className="text-lg text-gray-600 dark:text-gray-400">
-              Chào mừng trở lại, <strong>{user.name || user.email}</strong>!
-              <br />
+              Chào mừng trở lại, <strong>{user.name || user.email}</strong>!<br />
               Hãy bắt đầu buổi học từ vựng ngay bây giờ.
             </p>
           ) : (
@@ -79,5 +78,5 @@ export default function Home() {
         </p>
       )}
     </div>
-  )
+  );
 }
