@@ -5,7 +5,7 @@ import path from 'path'
 export default defineConfig({
   
   // FIX: Đường dẫn tương đối cho Vercel
-  base: './', 
+  base: '', 
   
   plugins: [react()],
   
