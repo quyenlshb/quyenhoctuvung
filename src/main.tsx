@@ -10,21 +10,25 @@ import { AuthProvider, useAuthProvider } from './components/AuthProvider'
 // Toaster UI
 import { Toaster } from './components/ui/toaster'
 
-// --------------------------
-// LẤY CONTEXT AUTH CHO APP
-// --------------------------
-const authContext = useAuthProvider()
+// ==========================
+// ROOT COMPONENT
+// ==========================
+function Root() {
+  // ✅ Hook phải được gọi bên trong component
+  const authContext = useAuthProvider()
 
-// --------------------------
-// RENDER APP
-// --------------------------
+  return (
+    <BrowserRouter>
+      <AuthProvider value={authContext}>
+        <App />
+        <Toaster /> {/* Phải có Toaster nếu dùng useToast */}
+      </AuthProvider>
+    </BrowserRouter>
+  )
+}
+
+// ==========================
+// RENDER
+// ==========================
 const root = createRoot(document.getElementById('app')!)
-
-root.render(
-  <BrowserRouter>
-    <AuthProvider value={authContext}>
-      <App />
-      <Toaster /> {/* Phải có Toaster nếu dùng useToast */}
-    </AuthProvider>
-  </BrowserRouter>
-)
+root.render(<Root />)
