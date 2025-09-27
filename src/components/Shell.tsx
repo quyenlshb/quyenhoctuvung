@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'; 
-import { LogOut, Home, Settings, Brain, BookOpen, BarChart3, Menu, X, User as UserIcon, Loader2 } from 'lucide-react'; // Thêm Loader2
+import { LogOut, Home, Settings, Brain, BookOpen, BarChart3, Menu, X, User as UserIcon, Loader2 } from 'lucide-react'; 
 import { useState, useEffect } from 'react';
 
 import { useIsMobile } from '../hooks/use-mobile.tsx';
@@ -7,7 +7,6 @@ import { Button } from './ui/button';
 import { useAuth } from './AuthProvider'; 
 
 export default function Shell() {
-  // ✅ Cập nhật: Thêm showAuthForm vào destructuring
   const { user, logout, showAuthModal, loading, showAuthForm } = useAuth(); 
   const isMobile = useIsMobile();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -15,7 +14,7 @@ export default function Shell() {
   
   const handleLogout = () => {
     logout(); 
-    setIsMenuOpen(false); // Đóng menu sau khi đăng xuất
+    setIsMenuOpen(false); 
   };
 
   // Các đường dẫn cần bảo vệ
@@ -23,7 +22,7 @@ export default function Shell() {
   const isProtected = protectedRoutes.includes(location.pathname);
 
 
-  // ✅ LOGIC BẢO VỆ ROUTE VÀ HIỂN THỊ AUTH MODAL
+  // LOGIC BẢO VỆ ROUTE VÀ HIỂN THỊ AUTH MODAL
   useEffect(() => {
     // Nếu không trong quá trình tải, người dùng chưa đăng nhập, và đang ở trang bảo vệ:
     if (!loading && !user && isProtected) {
@@ -37,7 +36,7 @@ export default function Shell() {
     if (!isProtected && showAuthForm) {
         showAuthModal(false);
     }
-  }, [loading, user, isProtected, showAuthModal, location.pathname]); // Thêm location.pathname
+  }, [loading, user, isProtected, showAuthModal, location.pathname, showAuthForm]); // Thêm showAuthForm vào dependency
 
   // Logic Nav Items (giữ nguyên)
   const navItems = [
@@ -48,15 +47,13 @@ export default function Shell() {
     { to: '/settings', label: 'Cài đặt', icon: Settings, isProtected: true },
   ];
 
-  // ✅ LOGIC ĐIỀU KIỆN RENDER
-  // Chỉ render Outlet nếu:
-  // 1. Quá trình tải kết thúc (loading == false) VÀ 
-  // 2. (Route KHÔNG được bảo vệ HOẶC Người dùng ĐÃ đăng nhập) VÀ
-  // 3. Auth Modal KHÔNG đang mở (chỉ cần kiểm tra nếu đang ở protected route)
+  // LOGIC ĐIỀU KIỆN RENDER
+  // Chỉ render Outlet nếu: Quá trình tải kết thúc VÀ (Route KHÔNG bảo vệ HOẶC Người dùng ĐÃ đăng nhập)
+  // và Auth Modal KHÔNG đang mở khi ở protected route
   const shouldRenderOutlet = !loading && (!isProtected || user) && (!isProtected || !showAuthForm);
   
   
-  // Mobile Menu UI (Giữ nguyên)
+  // Mobile Menu UI 
   const MobileMenu = ({ navItems, isMenuOpen, setIsMenuOpen, handleLogout, user }: any) => (
     <div 
         className={`fixed inset-0 z-40 lg:hidden transition-opacity duration-300 ${isMenuOpen ? 'opacity-100 visible' : 'opacity-0 invisible'}`}
@@ -100,12 +97,12 @@ export default function Shell() {
                         <Link
                             key={item.to}
                             to={item.to}
-                            className={`flex items-center p-3 rounded-lg transition-colors \
-                                ${location.pathname === item.to 
-                                    ? 'bg-primary text-primary-foreground font-semibold' 
-                                    : 'text-foreground hover:bg-accent dark:hover:bg-gray-700'\
-                                }`}
                             onClick={() => setIsMenuOpen(false)}
+                            className={`flex items-center p-3 rounded-lg transition-colors ${
+                                location.pathname === item.to 
+                                    ? 'bg-primary text-primary-foreground font-semibold' 
+                                    : 'text-foreground hover:bg-accent dark:hover:bg-gray-700'
+                                }`}
                         >
                             <item.icon className="h-5 w-5 mr-3 shrink-0" />
                             <span className="text-sm">{item.label}</span>
@@ -131,7 +128,7 @@ export default function Shell() {
     </div>
   )
 
-  // Sidebar Desktop UI (Giữ nguyên)
+  // Sidebar Desktop UI 
   const Sidebar = ({ navItems, handleLogout, user }: any) => (
     <div className="hidden lg:flex lg:flex-shrink-0">
       <div className="flex flex-col w-64 border-r dark:border-gray-800 bg-white dark:bg-gray-900">
@@ -168,10 +165,10 @@ export default function Shell() {
                 <Link
                   key={item.to}
                   to={item.to}
-                  className={`flex items-center p-3 rounded-lg transition-colors \
-                    ${location.pathname === item.to 
+                  className={`flex items-center p-3 rounded-lg transition-colors ${
+                    location.pathname === item.to 
                       ? 'bg-primary text-primary-foreground font-semibold' 
-                      : 'text-foreground hover:bg-accent dark:hover:bg-gray-700'\
+                      : 'text-foreground hover:bg-accent dark:hover:bg-gray-700'
                     }`}
                 >
                   <item.icon className="h-5 w-5 mr-3 shrink-0" />
@@ -200,7 +197,7 @@ export default function Shell() {
   )
 
 
-  // Header Mobile UI (Giữ nguyên)
+  // Header Mobile UI 
   const HeaderMobile = ({ isMobile, isMenuOpen, setIsMenuOpen, user }: any) => {
     if (!isMobile) return null;
     return (
@@ -252,7 +249,7 @@ export default function Shell() {
             <span className="ml-2 text-gray-500">Đang tải bố cục...</span>
           </div>
         ) : (
-          // ✅ RENDER CÓ ĐIỀU KIỆN
+          // RENDER CÓ ĐIỀU KIỆN
           shouldRenderOutlet ? (
             <div className={`p-4 md:p-8 ${isMobile ? 'pt-20' : ''}`}>
                 <Outlet /> {/* Render nội dung trang con */}
@@ -272,7 +269,7 @@ export default function Shell() {
                     </Card>
                 </div>
              ) : (
-                // Nếu đang ở trang không bảo vệ nhưng AuthModal không mở (ví dụ: Trang chủ)
+                // Nếu đang ở trang không bảo vệ
                 <div className={`p-4 md:p-8 ${isMobile ? 'pt-20' : ''}`}>
                     <Outlet /> 
                 </div>
