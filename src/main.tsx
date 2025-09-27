@@ -1,17 +1,16 @@
-import { createRoot } from 'react-dom/client'
+// src/main.tsx
+import React from 'react'
+import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
-import './shadcn.css'
 import App from './App'
-import { AuthProvider } from './components/AuthProvider'
-import { Toaster } from './components/ui/toaster'
 
-const root = createRoot(document.getElementById('app')!)
+// Global styles
+import './index.css'
 
-root.render(
-  <BrowserRouter>
-    <AuthProvider>
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <BrowserRouter>
       <App />
-      <Toaster /> {/* Phải có nếu dùng useToast */}
-    </AuthProvider>
-  </BrowserRouter>
+    </BrowserRouter>
+  </React.StrictMode>
 )

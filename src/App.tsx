@@ -1,41 +1,41 @@
 // src/App.tsx
 import { Routes, Route } from 'react-router-dom'
 
-// 1. IMPORT COMPONENTS CHÍNH
+// Pages
+import Home from './pages/Home'
+
+// Components
 import Shell from './components/Shell'
-import HomePage from './pages/HomePage'
 import LearningMode from './components/LearningMode'
 import VocabularyManager from './components/VocabularyManager'
-import StatisticsPage from './pages/StatisticsPage'
-import SettingsPage from './pages/SettingsPage'
 
-// 2. IMPORT AUTH
-import { AuthProvider, useAuthProvider } from './components/AuthProvider'
+// Auth
+import { AuthProvider, useAuthProvider, AuthModal } from './components/AuthProvider'
 
-// 3. IMPORT TOASTER
+// Toaster
 import { Toaster } from './components/ui/toaster'
 
 export default function App() {
+  // Lấy context auth
   const authContext = useAuthProvider()
 
   return (
     <AuthProvider value={authContext}>
-      <Toaster /> {/* Phải có Toaster nếu dùng useToast */}
-      <Routes>
-        <Route path="/" element={<Shell />}>
-          {/* Trang chính */}
-          <Route index element={<HomePage />} />
+      <Shell>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/learn/:setId" element={<LearningMode />} />
+          <Route path="/vocabulary" element={<VocabularyManager />} />
+          <Route path="/statistics" element={<div>Thống kê</div>} />
+          <Route path="/settings" element={<div>Cài đặt</div>} />
+        </Routes>
+      </Shell>
 
-          {/* Protected routes */}
-          <Route path="learn" element={<LearningMode />} />
-          <Route path="vocabulary" element={<VocabularyManager />} />
-          <Route path="statistics" element={<StatisticsPage />} />
-          <Route path="settings" element={<SettingsPage />} />
-          
-          {/* Fallback */}
-          <Route path="*" element={<HomePage />} />
-        </Route>
-      </Routes>
+      {/* Modal Auth */}
+      <AuthModal />
+
+      {/* Toaster */}
+      <Toaster />
     </AuthProvider>
   )
 }
