@@ -1,41 +1,57 @@
-// src/App.tsx
-import { Routes, Route } from 'react-router-dom'
-
-// Pages
+import React, { useState } from 'react'
+import { Routes, Route, Navigate } from 'react-router-dom'
+import { AuthProvider, useAuth } from './components/AuthProvider'
 import Home from './pages/Home'
-
-// Components
-import Shell from './components/Shell'
 import LearningMode from './components/LearningMode'
 import VocabularyManager from './components/VocabularyManager'
-
-// Auth
-import { AuthProvider, useAuthProvider, AuthModal } from './components/AuthProvider'
-
-// Toaster
 import { Toaster } from './components/ui/toaster'
 
-export default function App() {
-  // Lấy context auth
-  const authContext = useAuthProvider()
+function RequireAuth({ children }: { children: JSX.Element }) {
+  const { user } = useAuth()
+  if (!user) {
+    return <Navigate to="/" replace />
+  }
+  return children
+}
+
+function MainApp() {
+  const { user, openAuthModal } = useAuth()
 
   return (
-    <AuthProvider value={authContext}>
-      <Shell>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/learn/:setId" element={<LearningMode />} />
-          <Route path="/vocabulary" element={<VocabularyManager />} />
-          <Route path="/statistics" element={<div>Thống kê</div>} />
-          <Route path="/settings" element={<div>Cài đặt</div>} />
-        </Routes>
-      </Shell>
-
-      {/* Modal Auth */}
-      <AuthModal />
-
-      {/* Toaster */}
+    <>
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <Home onLoginClick={openAuthModal} />
+          }
+        />
+        <Route
+          path="/learn/:setId"
+          element={
+            <RequireAuth>
+              <LearningMode />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/vocabulary"
+          element={
+            <RequireAuth>
+              <VocabularyManager />
+            </RequireAuth>
+          }
+        />
+      </Routes>
       <Toaster />
+    </>
+  )
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <MainApp />
     </AuthProvider>
   )
 }

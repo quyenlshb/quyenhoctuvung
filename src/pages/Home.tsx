@@ -6,8 +6,8 @@ import { Badge } from '../components/ui/badge'
 import { useAuth } from '../components/AuthProvider'
 import { getVocabularySets } from '../lib/firebase'
 
-export default function HomePage() {
-  const { user, showAuthModal } = useAuth()  // Lấy showAuthModal
+export default function Home() {
+  const { user, showAuthModal } = useAuth() // Lấy showAuthModal
   const navigate = useNavigate()
   const [sets, setSets] = useState<any[]>([])
 
@@ -39,7 +39,6 @@ export default function HomePage() {
               <p className="text-lg text-gray-600 dark:text-gray-400">
                 Vui lòng đăng nhập hoặc đăng ký để bắt đầu hành trình học từ vựng của bạn.
               </p>
-              {/* Nút đăng nhập */}
               <Button className="mt-4" onClick={() => showAuthModal(true)}>
                 Đăng nhập
               </Button>
@@ -61,10 +60,7 @@ export default function HomePage() {
               </CardHeader>
               <CardContent className="flex flex-col justify-between mt-2">
                 <p className="text-sm text-gray-600 dark:text-gray-400">{set.description}</p>
-                <Button
-                  className="mt-3"
-                  onClick={() => navigate(`/learn/${set.id}`)}
-                >
+                <Button className="mt-3" onClick={() => navigate(`/learn/${set.id}`)}>
                   Học bộ từ này
                 </Button>
               </CardContent>
@@ -76,7 +72,10 @@ export default function HomePage() {
       {/* Thông báo nếu chưa có bộ từ */}
       {user && sets.length === 0 && (
         <p className="text-gray-600 dark:text-gray-400 mt-4">
-          Bạn chưa có bộ từ nào. Vui lòng tạo trong <span className="text-primary cursor-pointer" onClick={() => navigate('/vocabulary')}>Quản lý Từ vựng</span>.
+          Bạn chưa có bộ từ nào. Vui lòng tạo trong{' '}
+          <span className="text-primary cursor-pointer" onClick={() => navigate('/vocabulary')}>
+            Quản lý Từ vựng
+          </span>.
         </p>
       )}
     </div>
