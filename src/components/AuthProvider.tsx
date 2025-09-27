@@ -10,6 +10,7 @@ import { Input } from './ui/input'
 import { Label } from './ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 import { Dialog, DialogContent } from './ui/dialog' 
+import { DialogTitle } from './ui/DialogTitle'
 import { 
   User as UserIcon, 
   Mail, 
