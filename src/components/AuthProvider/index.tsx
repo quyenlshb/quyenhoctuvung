@@ -1,16 +1,5 @@
-// File: src/components/AuthProvider/index.tsx
-import { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react'
-import {
-  auth,
-  googleProvider,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signInWithPopup,
-  signOut,
-  onAuthStateChanged,
-  saveUserData,
-  getUserData
-} from '../../lib/firebase'
+import { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react'
+import { auth, googleProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, signOut, onAuthStateChanged, saveUserData, getUserData } from '../../lib/firebase'
 import { User, AuthContextType } from './types'
 
 // --------------------------
@@ -52,19 +41,8 @@ export function useAuthProvider() {
 
   const register = async (name: string, email: string, password: string) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password)
-    const newUser: User = {
-      id: userCredential.user.uid,
-      email,
-      name,
-      totalWords: 0
-    }
-    await saveUserData(newUser.id, {
-      name: newUser.name,
-      email: newUser.email,
-      totalPoints: 0,
-      streak: 0,
-      totalWords: 0
-    })
+    const newUser: User = { id: userCredential.user.uid, email, name, totalWords: 0 }
+    await saveUserData(newUser.id, { name, email, totalPoints: 0, streak: 0, totalWords: 0 })
     setUser(newUser)
     setShowAuthForm(false)
   }
@@ -82,14 +60,7 @@ export function useAuthProvider() {
         photoURL: firebaseUser.photoURL || undefined,
         totalWords: 0
       }
-      await saveUserData(newUser.id, {
-        name: newUser.name,
-        email: newUser.email,
-        photoURL: newUser.photoURL,
-        totalPoints: 0,
-        streak: 0,
-        totalWords: 0
-      })
+      await saveUserData(newUser.id, { ...newUser, totalPoints: 0, streak: 0, totalWords: 0 })
       setUser(newUser)
     } else {
       setUser({
@@ -129,27 +100,14 @@ export function useAuthProvider() {
     return () => unsubscribe()
   }, [])
 
-  return {
-    user,
-    loading,
-    login,
-    register,
-    loginWithGoogle,
-    logout,
-    showAuthForm,
-    showAuthModal
-  }
+  return { user, loading, login, register, loginWithGoogle, logout, showAuthForm, showAuthModal }
 }
 
 // --------------------------
 // AuthProvider Component
 // --------------------------
-export function AuthProvider({ children, value }: { children: ReactNode, value: ReturnType<typeof useAuthProvider> }) {
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const value = useAuthProvider() // Hook chạy bên trong component
   const contextValue = useMemo(() => value, [value])
   return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
 }
-
-// --------------------------
-// Export AuthModal để App.tsx import
-// --------------------------
-export { default as AuthModal } from './AuthModal'
