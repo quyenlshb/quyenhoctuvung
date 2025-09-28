@@ -1,23 +1,17 @@
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
-import { Separator } from '../ui/separator'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 
-type Props = {
-  settings: {
-    timer: number
-    wordsPerSession: number
-    dailyGoal: number
-  }
-  handleSettingChange: (key: keyof typeof settings, value: any) => void
+interface LearningTabProps {
   settings: any
+  onChange: (key: string, value: any) => void
 }
 
-export default function LearningTab({ settings, handleSettingChange }: any) {
+export function LearningTab({ settings, onChange }: LearningTabProps) {
   return (
     <Card className="bg-white dark:bg-gray-800 border-0 shadow-lg">
       <CardHeader>
-        <CardTitle>Cấu hình Bài học</CardTitle>
+        <CardTitle>Cấu hình bài học</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
@@ -26,7 +20,7 @@ export default function LearningTab({ settings, handleSettingChange }: any) {
             id="words-per-session"
             type="number"
             value={settings.wordsPerSession}
-            onChange={(e) => handleSettingChange('wordsPerSession', parseInt(e.target.value))}
+            onChange={e => onChange('wordsPerSession', parseInt(e.target.value))}
             min={5}
             max={50}
           />
@@ -37,20 +31,9 @@ export default function LearningTab({ settings, handleSettingChange }: any) {
             id="timer"
             type="number"
             value={settings.timer}
-            onChange={(e) => handleSettingChange('timer', parseInt(e.target.value))}
+            onChange={e => onChange('timer', parseInt(e.target.value))}
             min={5}
             max={60}
-          />
-        </div>
-        <Separator />
-        <div className="space-y-2">
-          <Label htmlFor="daily-goal">Mục tiêu từ vựng hàng ngày</Label>
-          <Input
-            id="daily-goal"
-            type="number"
-            value={settings.dailyGoal}
-            onChange={(e) => handleSettingChange('dailyGoal', parseInt(e.target.value))}
-            min={1}
           />
         </div>
       </CardContent>
