@@ -1,20 +1,23 @@
-import { Card, CardContent, CardHeader, CardTitle, Separator } from '../ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
+import { Separator } from '../ui/separator'
 import { Label } from '../ui/label'
 import { Switch } from '../ui/switch'
-import { Bell } from 'lucide-react'
 
-interface SettingsProps {
-  settings: any
-  onChange: (key: string, value: any) => void
+type Props = {
+  settings: {
+    reminderEnabled: boolean
+    reminderTime: string
+    soundEnabled: boolean
+    vibrationEnabled: boolean
+  }
+  handleSettingChange: (key: keyof typeof settings, value: any) => void
 }
 
-export default function NotificationsTab({ settings, onChange }: SettingsProps) {
+export default function NotificationsTab({ settings, handleSettingChange }: any) {
   return (
     <Card className="bg-white dark:bg-gray-800 border-0 shadow-lg">
       <CardHeader>
-        <CardTitle className="flex items-center">
-          <Bell className="h-5 w-5 mr-2 text-secondary" /> Cài đặt Thông báo
-        </CardTitle>
+        <CardTitle>Cài đặt Thông báo</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-center justify-between">
@@ -24,7 +27,7 @@ export default function NotificationsTab({ settings, onChange }: SettingsProps) 
           <Switch
             id="reminder-enabled"
             checked={settings.reminderEnabled}
-            onCheckedChange={(checked) => onChange('reminderEnabled', checked)}
+            onCheckedChange={(checked) => handleSettingChange('reminderEnabled', checked)}
           />
         </div>
         {settings.reminderEnabled && (
@@ -34,8 +37,8 @@ export default function NotificationsTab({ settings, onChange }: SettingsProps) 
               id="reminder-time"
               type="time"
               value={settings.reminderTime}
-              onChange={(e) => onChange('reminderTime', e.target.value)}
-              className="input input-bordered w-full"
+              onChange={(e) => handleSettingChange('reminderTime', e.target.value)}
+              className="border rounded px-2 py-1 w-full"
             />
           </div>
         )}
@@ -47,7 +50,7 @@ export default function NotificationsTab({ settings, onChange }: SettingsProps) 
           <Switch
             id="sound-enabled"
             checked={settings.soundEnabled}
-            onCheckedChange={(checked) => onChange('soundEnabled', checked)}
+            onCheckedChange={(checked) => handleSettingChange('soundEnabled', checked)}
           />
         </div>
         <div className="flex items-center justify-between">
@@ -57,7 +60,7 @@ export default function NotificationsTab({ settings, onChange }: SettingsProps) 
           <Switch
             id="vibration-enabled"
             checked={settings.vibrationEnabled}
-            onCheckedChange={(checked) => onChange('vibrationEnabled', checked)}
+            onCheckedChange={(checked) => handleSettingChange('vibrationEnabled', checked)}
           />
         </div>
       </CardContent>
