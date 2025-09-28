@@ -1,36 +1,29 @@
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card"
-import { Input } from "../../components/ui/input"
-import { Label } from "../../components/ui/label"
-import { Separator } from "../../components/ui/separator"
-import { Timer } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle, Separator } from '../ui/card'
+import { Input } from '../ui/input'
+import { Label } from '../ui/label'
+import { Timer } from 'lucide-react'
 
-export default function LearningSettings() {
-  const [settings, setSettings] = useState({
-    wordsPerSession: 10,
-    timer: 15,
-    dailyGoal: 50,
-  })
+interface SettingsProps {
+  settings: any
+  onChange: (key: string, value: any) => void
+}
 
-  const handleChange = (key: keyof typeof settings, value: number) => {
-    setSettings(prev => ({ ...prev, [key]: value }))
-  }
-
+export default function LearningTab({ settings, onChange }: SettingsProps) {
   return (
-    <Card className="bg-white dark:bg-gray-800 border-0 shadow-lg mt-6">
+    <Card className="bg-white dark:bg-gray-800 border-0 shadow-lg">
       <CardHeader>
         <CardTitle className="flex items-center">
           <Timer className="h-5 w-5 mr-2 text-secondary" /> Cấu hình Bài học
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="words-per-session">Số từ mỗi phiên</Label>
           <Input
             id="words-per-session"
             type="number"
             value={settings.wordsPerSession}
-            onChange={(e) => handleChange("wordsPerSession", parseInt(e.target.value))}
+            onChange={(e) => onChange('wordsPerSession', parseInt(e.target.value))}
             min={5}
             max={50}
           />
@@ -41,8 +34,8 @@ export default function LearningSettings() {
             id="timer"
             type="number"
             value={settings.timer}
-            onChange={(e) => handleChange("timer", parseInt(e.target.value))}
-            min={5}
+            onChange={(e) => onChange('timer', parseInt(e.target.value))}
+            min={0}
             max={60}
           />
         </div>
@@ -53,7 +46,7 @@ export default function LearningSettings() {
             id="daily-goal"
             type="number"
             value={settings.dailyGoal}
-            onChange={(e) => handleChange("dailyGoal", parseInt(e.target.value))}
+            onChange={(e) => onChange('dailyGoal', parseInt(e.target.value))}
             min={1}
           />
         </div>
