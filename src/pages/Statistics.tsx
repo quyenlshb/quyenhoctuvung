@@ -1,37 +1,17 @@
-/**
- * Statistics Page
- * Displays detailed learning progress, achievements, and analytics
- * UPDATED: Fetch user stats and learning sessions from Firestore
- */
-
+// src/pages/Statistics.tsx
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Progress } from '../components/ui/progress'
 import { Badge } from '../components/ui/badge'
-import { Button } from '../components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { 
-  TrendingUp, 
-  Trophy, 
-  Target, 
-  Calendar, 
-  Clock,
-  Brain,
-  BookOpen,
-  Flame,
-  Award,
-  BarChart3,
-  Loader2 
+  TrendingUp, Trophy, Target, Calendar, Clock, Brain, BookOpen, Flame, Award, BarChart3, Loader2 
 } from 'lucide-react'
 
-// 1. IMPORT CÁC THÀNH PHẦN FIREBASE & AUTH
 import { useAuth } from '../components/AuthProvider'
-// ✅ SỬA: Thêm getLearningSessions
 import { getUserStatistics, getLearningSessions } from '../lib/firebase' 
-import type { LearningSessionHistory } from '../lib/firebase' // Import type từ firebase.ts
+import type { LearningSessionHistory } from '../lib/firebase'
 
-// 2. DEFINE INTERFACE VÀ INITIAL STATE
-// ✅ SỬA: Dùng LearningSessionHistory đã import
 interface UserStats {
   totalPoints: number
   totalWordsLearned: number
@@ -44,44 +24,38 @@ interface Achievement {
   id: string
   title: string
   description: string
-  icon: string // Emojis hoặc Lucide Icon
+  icon: string
   unlocked: boolean
   progress?: number
   maxProgress?: number
 }
 
-// Giữ nguyên mockAchievements
 const mockAchievements: Achievement[] = [
   { id: '1', title: 'Người học đầu tiên', description: 'Hoàn thành phiên học đầu tiên', icon: '⭐', unlocked: false, progress: 1, maxProgress: 1 },
   { id: '2', title: '100 từ vựng', description: 'Đã học được 100 từ', icon: '💯', unlocked: false, progress: 50, maxProgress: 100 },
   { id: '3', title: '5 ngày liên tục', description: 'Học liên tục trong 5 ngày', icon: '🔥', unlocked: false, progress: 3, maxProgress: 5 },
   { id: '4', title: 'Chính xác 90%', description: 'Đạt độ chính xác 90% trong 5 phiên học', icon: '🎯', unlocked: false, progress: 0, maxProgress: 5 },
   { id: '5', title: 'Hàng ngàn điểm', description: 'Đạt 1000 điểm tích lũy', icon: '🏆', unlocked: false, progress: 0, maxProgress: 1000 },
-];
+]
 
-export default function Statistics() {
+export function Statistics() {
   const { user } = useAuth()
-  
-  // State cho Thống kê tổng thể
+
   const [userStats, setUserStats] = useState<UserStats | null>(null)
   const [isStatsLoading, setIsStatsLoading] = useState(true)
-  
-  // 3. THÊM STATE CHO LỊCH SỬ PHIÊN HỌC THỰC TẾ
-  const [learningSessions, setLearningSessions] = useState<LearningSessionHistory[]>([]); 
-  const [isSessionsLoading, setIsSessionsLoading] = useState(true);
-  
+
+  const [learningSessions, setLearningSessions] = useState<LearningSessionHistory[]>([])
+  const [isSessionsLoading, setIsSessionsLoading] = useState(true)
+
   const [achievements, setAchievements] = useState(mockAchievements)
-  
-  // Tải thống kê người dùng tổng thể (Đã có, giữ nguyên)
+
   useEffect(() => {
     if (!user?.id) return
     const loadUserStats = async () => {
       setIsStatsLoading(true)
       try {
         const statsData = await getUserStatistics(user.id)
-        if (statsData) {
-          setUserStats(statsData as UserStats)
-        }
+        if (statsData) setUserStats(statsData as UserStats)
       } catch (error) {
         console.error('Error loading stats:', error)
       } finally {
@@ -91,48 +65,34 @@ export default function Statistics() {
     loadUserStats()
   }, [user?.id])
 
-  // 4. THÊM useEffect ĐỂ TẢI LỊCH SỬ PHIÊN HỌC
   useEffect(() => {
-    if (!user?.id) return;
-
+    if (!user?.id) return
     const fetchSessions = async () => {
-        setIsSessionsLoading(true);
-        try {
-            // Lấy 10 phiên học gần nhất
-            const sessions = await getLearningSessions(user.id, 10); 
-            setLearningSessions(sessions);
-        } catch (error) {
-            console.error('Error loading learning sessions:', error);
-        } finally {
-            setIsSessionsLoading(false);
-        }
-    };
+      setIsSessionsLoading(true)
+      try {
+        const sessions = await getLearningSessions(user.id, 10)
+        setLearningSessions(sessions)
+      } catch (error) {
+        console.error('Error loading learning sessions:', error)
+      } finally {
+        setIsSessionsLoading(false)
+      }
+    }
+    fetchSessions()
+  }, [user?.id])
 
-    fetchSessions();
-  }, [user?.id]); 
-
-  // Format ngày tháng cho lịch sử
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('vi-VN', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  };
-  
-  // ... (Giữ nguyên logic render)
+    const date = new Date(dateString)
+    return date.toLocaleDateString('vi-VN', { year: 'numeric', month: 'long', day: 'numeric' })
+  }
 
   return (
     <div className="p-4 md:p-0">
-      <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">
-        📊 Thống kê Học tập
-      </h1>
+      <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">📊 Thống kê Học tập</h1>
 
-      {/* Tổng quan */}
       {isStatsLoading ? (
         <div className="flex justify-center items-center h-20">
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -143,114 +103,86 @@ export default function Statistics() {
         </div>
       )}
 
-      {/* Tabs cho Chi tiết */}
-      <div className="mt-8">
-        <Tabs defaultValue="chart" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="chart">Biểu đồ</TabsTrigger>
-            <TabsTrigger value="history">Lịch sử</TabsTrigger>
-            <TabsTrigger value="achievements">Thành tựu</TabsTrigger>
-          </TabsList>
+      <Tabs defaultValue="chart" className="w-full mt-8">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="chart">Biểu đồ</TabsTrigger>
+          <TabsTrigger value="history">Lịch sử</TabsTrigger>
+          <TabsTrigger value="achievements">Thành tựu</TabsTrigger>
+        </TabsList>
 
-          {/* Tab Biểu đồ (Giữ nguyên) */}
-          <TabsContent value="chart" className="mt-4">
-            <Card className="bg-white dark:bg-gray-800 shadow-lg p-6 min-h-[300px]">
-                <CardTitle className="text-xl mb-4">Tiến trình học tập (7 ngày)</CardTitle>
-                <p className="text-gray-500 dark:text-gray-400">
-                    // TODO: Tích hợp thư viện recharts để vẽ biểu đồ từ dữ liệu LearningSessionHistory.
-                    {/*  */}
-                </p>
-                <div className="flex justify-center items-center h-40">
-                    <BarChart3 className="h-10 w-10 text-gray-400 opacity-50" />
-                    <p className="ml-4 text-gray-500">Biểu đồ đang được xây dựng...</p>
-                </div>
+        <TabsContent value="chart" className="mt-4">
+          <Card className="bg-white dark:bg-gray-800 shadow-lg p-6 min-h-[300px]">
+            <CardTitle className="text-xl mb-4">Tiến trình học tập (7 ngày)</CardTitle>
+            <div className="flex justify-center items-center h-40">
+              <BarChart3 className="h-10 w-10 text-gray-400 opacity-50" />
+              <p className="ml-4 text-gray-500">Biểu đồ đang được xây dựng...</p>
+            </div>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="history" className="mt-4">
+          {isSessionsLoading ? (
+            <div className="flex justify-center items-center h-40">
+              <Loader2 className="h-6 w-6 animate-spin mr-2 text-primary" />
+              <p className="text-gray-500">Đang tải lịch sử phiên học...</p>
+            </div>
+          ) : learningSessions.length === 0 ? (
+            <Card className="text-center p-6 bg-white/80 dark:bg-gray-800/80">
+              <CardTitle className="text-lg">Chưa có phiên học nào</CardTitle>
+              <CardDescription className="mt-2">
+                Hãy bắt đầu học từ vựng để thấy lịch sử tiến trình của bạn ở đây!
+              </CardDescription>
             </Card>
-          </TabsContent>
-          
-          {/* 5. CẬP NHẬT: Tab Lịch sử Phiên học */}
-          <TabsContent value="history" className="mt-4">
-            {isSessionsLoading ? (
-                <div className="flex justify-center items-center h-40">
-                    <Loader2 className="h-6 w-6 animate-spin mr-2 text-primary" />
-                    <p className="text-gray-500">Đang tải lịch sử phiên học...</p>
-                </div>
-            ) : learningSessions.length === 0 ? (
-                <Card className="text-center p-6 bg-white/80 dark:bg-gray-800/80">
-                    <CardTitle className="text-lg">Chưa có phiên học nào</CardTitle>
-                    <CardDescription className="mt-2">
-                        Hãy bắt đầu học từ vựng để thấy lịch sử tiến trình của bạn ở đây!
-                    </CardDescription>
-                </Card>
-            ) : (
-                <div className="space-y-4">
-                    {learningSessions.map((session, index) => (
-                        <Card key={session.id || index} className="bg-white dark:bg-gray-800 shadow-sm transition-shadow hover:shadow-md">
-                            <CardContent className="p-4 flex justify-between items-center">
-                                <div className="flex items-center space-x-4">
-                                    <Clock className="h-6 w-6 text-indigo-500" />
-                                    <div>
-                                        <p className="font-medium text-gray-800 dark:text-white">
-                                            Phiên học ngày {formatDate(session.date)}
-                                        </p>
-                                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                                            {session.wordsLearned} từ | {session.timeSpent}s
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-lg font-bold text-green-600 dark:text-green-400">
-                                        +{session.points} điểm
-                                    </p>
-                                    <Badge variant="secondary" className="mt-1">
-                                        {Math.round(session.accuracy * 100)}% Chính xác
-                                    </Badge>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
-            )}
-          </TabsContent>
-
-          {/* Tab Thành tựu (Giữ nguyên) */}
-          <TabsContent value="achievements" className="mt-4">
-            <Card className="shadow-lg">
-              <CardHeader>
-                <CardTitle>Đang tiến hành</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {achievements.filter(a => !a.unlocked && a.progress).map((achievement) => (
-                    <div key={achievement.id} className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                      <span className="text-2xl opacity-50">{achievement.icon}</span>
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-800 dark:text-white">
-                          {achievement.title}
-                        </p>
-                        <p className="text-sm text-gray-600 dark:text-gray-300">
-                          {achievement.description}
-                        </p>
-                        <Progress 
-                          value={(achievement.progress! / achievement.maxProgress!) * 100} 
-                          className="h-2 mt-2" 
-                        />
-                        <p className="text-xs text-gray-500 mt-1">
-                          {achievement.progress}/{achievement.maxProgress}
-                        </p>
+          ) : (
+            <div className="space-y-4">
+              {learningSessions.map((session, index) => (
+                <Card key={session.id || index} className="bg-white dark:bg-gray-800 shadow-sm transition-shadow hover:shadow-md">
+                  <CardContent className="p-4 flex justify-between items-center">
+                    <div className="flex items-center space-x-4">
+                      <Clock className="h-6 w-6 text-indigo-500" />
+                      <div>
+                        <p className="font-medium text-gray-800 dark:text-white">Phiên học ngày {formatDate(session.date)}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">{session.wordsLearned} từ | {session.timeSpent}s</p>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-green-600 dark:text-green-400">+{session.points} điểm</p>
+                      <Badge variant="secondary" className="mt-1">{Math.round(session.accuracy * 100)}% Chính xác</Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="achievements" className="mt-4">
+          <Card className="shadow-lg">
+            <CardHeader>
+              <CardTitle>Đang tiến hành</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {achievements.filter(a => !a.unlocked && a.progress).map((achievement) => (
+                  <div key={achievement.id} className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <span className="text-2xl opacity-50">{achievement.icon}</span>
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-800 dark:text-white">{achievement.title}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-300">{achievement.description}</p>
+                      <Progress value={(achievement.progress! / achievement.maxProgress!) * 100} className="h-2 mt-2" />
+                      <p className="text-xs text-gray-500 mt-1">{achievement.progress}/{achievement.maxProgress}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
 
-// StatCard component (Giữ nguyên)
 interface StatCardProps {
   icon: React.ReactNode
   title: string
@@ -260,9 +192,7 @@ interface StatCardProps {
 const StatCard: React.FC<StatCardProps> = ({ icon, title, value }) => (
   <Card className="text-center shadow-md bg-white dark:bg-gray-800">
     <CardContent className="p-4">
-      <div className="flex items-center justify-center mb-2">
-        {icon}
-      </div>
+      <div className="flex items-center justify-center mb-2">{icon}</div>
       <p className="text-2xl font-bold text-gray-900 dark:text-white">{value.toLocaleString()}</p>
       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{title}</p>
     </CardContent>

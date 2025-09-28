@@ -2,7 +2,7 @@ import React from "react";
 import { Routes, Route } from "react-router-dom";
 import { Home } from "./pages/Home";
 import { Settings } from "./pages/Settings";
-import { Statistics } from "./pages/Statistics";
+import { Statistics } from './pages/Statistics'
 import { AuthProvider } from "./components/AuthProvider";
 import { Shell } from "./components/Shell";
 
